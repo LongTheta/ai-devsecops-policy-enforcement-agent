@@ -1,12 +1,12 @@
 # AI DevSecOps Policy Enforcement Agent
 
-**A workflow-integrated policy enforcement engine for CI/CD and GitOps.** Deterministic analysis, compliance-aware rules, and reviewable auto-fix. DevSecOps + GitOps aware.
+**A workflow-integrated policy enforcement engine for CI/CD and GitOps.** Deterministic analysis, compliance-aware rules, and reviewable auto-fix. DevSecOps and GitOps aware — not a prototype.
 
 ---
 
 ## What Works Today
 
-This is a **working system** — not a prototype. Verifiable capabilities (see [docs/ROADMAP.md](docs/ROADMAP.md) for full list):
+This is a **working system** — not a framework or concept. Concrete capabilities implemented and verified:
 
 | Capability | Status |
 |------------|--------|
@@ -20,7 +20,10 @@ This is a **working system** — not a prototype. Verifiable capabilities (see [
 | Auto-fix: patch mode (write to output dir) | ✅ |
 | Auto-fix: apply mode (safe fixes only, with backups) | ✅ |
 | Verdict and severity breakdown (pass / fail / warnings) | ✅ |
+| Risk scoring (severity counts, critical/high/medium/low) | ✅ |
 | Remote fetch of pipeline from PR/MR | ✅ |
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for full list.
 
 ---
 
@@ -41,7 +44,7 @@ python -m ai_devsecops_agent.cli review \
   --artifact-dir artifacts
 ```
 
-Artifacts: `review-result.json`, `policy-summary.json`, `report.md`, `comments.json`, `remediations.json`.
+**Outputs:** `artifacts/review-result.json`, `artifacts/policy-summary.json`, `artifacts/report.md`, `artifacts/comments.json`, `artifacts/remediations.json`.
 
 ---
 
@@ -50,26 +53,40 @@ Artifacts: `review-result.json`, `policy-summary.json`, `report.md`, `comments.j
 ### Step 1 — Run review
 
 ```bash
+python -m ai_devsecops_agent.cli review-all \
+  --platform gitlab \
+  --pipeline examples/insecure-gitlab-ci.yml \
+  --gitops examples/insecure-argo-application.yaml \
+  --policy policies/fedramp-moderate.yaml \
+  --artifact-dir artifacts/
+```
+
+*(For local files, `review-all` works like `review`. Add `--output markdown --out report.md` to write a report file.)*
+
+```bash
+# Full flow (pipeline + GitOps + manifests):
 python -m ai_devsecops_agent.cli review \
   --platform gitlab \
   --pipeline examples/insecure-gitlab-argo-flow/.gitlab-ci.yml \
   --gitops examples/insecure-gitlab-argo-flow/argo-application.yaml \
   --manifests examples/insecure-gitlab-argo-flow/deployment.yaml \
   --policy policies/fedramp-moderate.yaml \
+  --include-comments \
+  --include-remediations \
   --output markdown \
   --out report.md \
-  --artifact-dir artifacts
+  --artifact-dir artifacts/
 ```
 
-### Step 2 — Show output
+### Step 2 — Inspect output
 
 - **Findings** — plaintext secrets, unpinned images, missing SBOM, risky Argo sync
 - **Verdict** — FAIL / PASS WITH WARNINGS / PASS
-- **Severity breakdown** — critical, high, medium, low
-- **Comments** — `artifacts/comments.json` or `artifacts/github-comments.json`
-- **Remediation** — `artifacts/remediations.json`
+- **Severity breakdown** — critical, high, medium, low (in `artifacts/policy-summary.json`)
+- **Comments** — `artifacts/comments.json`, `artifacts/github-comments.json`, or `artifacts/gitlab-comments.json`
+- **Remediation artifacts** — `artifacts/remediations.json`
 
-### Step 3 — Run auto-fix (suggest)
+### Step 3 — Run auto-fix
 
 ```bash
 python -m ai_devsecops_agent.cli auto-fix \
@@ -77,13 +94,13 @@ python -m ai_devsecops_agent.cli auto-fix \
   --mode suggest
 ```
 
-### Step 4 — Show diff
+### Step 4 — Show a diff
 
 Example output:
 
 ```diff
-- image: alpine:latest
-+ image: alpine@sha256:<resolve-digest>
+- image: node:latest
++ image: node:18.17.0
 
 - uses: actions/checkout@v4
 + uses: actions/checkout@<full-40-char-sha>
@@ -93,16 +110,22 @@ Or run `--mode patch --output-dir artifacts/fixes` to write patched copies.
 
 ---
 
-## Demo Examples
+## Demo Repositories
 
-Included in this repository:
+These repos are used or planned to validate the engine in real pipeline workflows:
 
-| Example | Path | Demonstrates |
-|---------|------|--------------|
-| **GitLab CI + Argo CD** | `examples/insecure-gitlab-argo-flow/` | Pipeline enforcement, findings, remediation, artifacts |
-| **GitHub Actions + Argo** | `examples/insecure-github-argo-flow/` | Cross-platform support, PR workflow integration |
-| **Auto-fix targets** | `examples/autofix/` | Unpinned actions, missing SBOM, risky Argo sync, missing resource limits |
-| **Standalone manifests** | `examples/insecure-argo-application.yaml`, `examples/insecure-k8s-deployment.yaml` | GitOps and K8s analysis |
+| Repository | Purpose |
+|------------|---------|
+| **demo-gitlab-argo-insecure-app** | GitLab CI + Argo CD + Kubernetes example with intentional security and policy violations. Demonstrates pipeline enforcement, findings, remediation, and artifacts. |
+| **demo-github-argo-insecure-app** | GitHub Actions + Argo CD example. Demonstrates cross-platform support and PR workflow integration. |
+| **demo-supply-chain-broken-build** | Example missing SBOM, provenance, and signing. Demonstrates supply chain policy enforcement. |
+| **demo-fixed-vs-broken** | Side-by-side insecure vs remediated configurations. Demonstrates auto-fix and improvement validation. |
+
+**Built-in examples** in this repo (same validation strategy):
+
+- `examples/insecure-gitlab-argo-flow/` — GitLab CI + Argo CD + K8s
+- `examples/insecure-github-argo-flow/` — GitHub Actions + Argo CD
+- `examples/autofix/` — Auto-fix targets (unpinned actions, missing SBOM, risky Argo sync, missing resource limits)
 
 ---
 
@@ -127,25 +150,21 @@ Included in this repository:
 | GitOps / Argo analysis | ✅ Implemented |
 | Policy enforcement | ✅ Implemented |
 | Remediation suggestions | ✅ Implemented |
-| Auto-fix (suggest / patch / apply) | ✅ Implemented |
-| — Safe to apply: resource limits, Argo sync, SBOM step | ✅ |
-| — Suggest only: pin image, pin action (need digest/SHA) | ✅ |
+| Auto-fix (suggest / patch / apply) | ✅ Implemented for safe subset |
 | PR/MR comment generation | ✅ Implemented |
-| Live PR/MR posting | ✅ Implemented (requires `GITHUB_TOKEN` or `GITLAB_TOKEN`) |
-| Verdict and severity breakdown | ✅ Implemented |
-| Remote fetch from PR/MR | ✅ Implemented (`review-all`) |
-| Auto-fix commit bot | 🔲 Planned |
-| Compliance evidence generation | 🔲 Planned |
-| Digest/SHA resolution for pin fixers | 🔲 Planned |
+| Risk scoring (severity breakdown) | ✅ Implemented |
+| Live PR/MR posting | 🚧 Partial / Optional (requires `GITHUB_TOKEN` or `GITLAB_TOKEN`) |
+| Auto-fix commit bot | 🚧 Planned |
+| Compliance evidence generation | 🚧 Planned |
 
 ---
 
 ## How This Fits in a CI/CD Pipeline
 
 1. **Run review** — `review` or `review-all` in CI (GitHub Actions, GitLab CI)
-2. **Generate artifacts** — JSON, Markdown, comments, remediations
+2. **Generate artifacts** — Markdown, JSON, comments, remediations
 3. **Fail on policy violations** — Exit code 1 when verdict is FAIL
-4. **Generate PR/MR comments** — Use `comments` or post from artifacts
+4. **Surface PR/MR comments** — Use `comments` or post from artifacts
 5. **Optionally run auto-fix** — `auto-fix --mode suggest` or `--mode patch` for reviewable fixes
 
 See [.github/workflows/policy-review.yml](.github/workflows/policy-review.yml) and [docs/WORKFLOW-INTEGRATION.md](docs/WORKFLOW-INTEGRATION.md).
@@ -155,7 +174,7 @@ See [.github/workflows/policy-review.yml](.github/workflows/policy-review.yml) a
 ## Architecture (High-Level)
 
 ```
-Analyzers → Policy Engine → Verdict → Remediation → Auto-Fix → Reporting → Workflow Integration
+Analyzers → Policy Engine → Risk Scoring → Remediation → Auto-Fix → Reporting → Workflow Integration
 ```
 
 | Component | Purpose |
@@ -271,7 +290,7 @@ Step-by-step guide: [docs/DEMO.md](docs/DEMO.md)
 
 ## Workflow Integration
 
-- **Artifact generation** — `--artifact-dir` writes `review-result.json`, `policy-summary.json`, `comments.json`, `remediations.json`, `workflow-status.json`
+- **Artifact generation** — `--artifact-dir` writes `review-result.json`, `policy-summary.json`, `report.md`, `comments.json`, `remediations.json`, `workflow-status.json`
 - **GitHub Actions** — [.github/workflows/policy-review.yml](.github/workflows/policy-review.yml)
 - **GitLab CI** — [examples/workflows/gitlab-policy-review.yml](examples/workflows/gitlab-policy-review.yml)
 - **Post comments** — `comments --post` with `GITHUB_TOKEN` or `GITLAB_TOKEN`
@@ -283,7 +302,7 @@ See [docs/WORKFLOW-INTEGRATION.md](docs/WORKFLOW-INTEGRATION.md).
 ## Design Principles
 
 - **Policy-driven, not hardcoded** — Rules live in YAML
-- **Deterministic first, AI-assisted second** — Predictable, auditable results
+- **Deterministic first, AI-assisted where useful** — Predictable, auditable results
 - **Workflow-integrated** — Drops into CI/CD pipelines
 - **Reviewable and safe auto-fix** — No freeform rewriting
 

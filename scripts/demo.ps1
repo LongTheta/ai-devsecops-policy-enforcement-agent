@@ -18,7 +18,7 @@ Read-Host "Press Enter to continue"
 Write-Host ""
 Write-Host "Step 2: Running policy review..." -ForegroundColor Yellow
 New-Item -ItemType Directory -Force -Path artifacts | Out-Null
-Invoke-Expression "$CLI review --platform gitlab --pipeline examples/insecure-gitlab-ci.yml --gitops examples/insecure-argo-application.yaml --policy policies/fedramp-moderate.yaml --output markdown --out report.md --artifact-dir artifacts" 2>$null
+Invoke-Expression "$CLI review --platform gitlab --pipeline examples/insecure-gitlab-ci.yml --gitops examples/insecure-argo-application.yaml --policy policies/fedramp-moderate.yaml --include-comments --include-remediations --output markdown --out report.md --artifact-dir artifacts" 2>$null
 Write-Host "Report written to report.md | Artifacts in artifacts/"
 Read-Host "Press Enter to continue"
 

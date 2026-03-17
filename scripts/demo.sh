@@ -32,6 +32,8 @@ $CLI review \
   --pipeline examples/insecure-gitlab-ci.yml \
   --gitops examples/insecure-argo-application.yaml \
   --policy policies/fedramp-moderate.yaml \
+  --include-comments \
+  --include-remediations \
   --output markdown \
   --out report.md \
   --artifact-dir artifacts || true

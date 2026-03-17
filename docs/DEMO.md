@@ -2,7 +2,7 @@
 
 Use this for **interviews**, **presentations**, or **internal demos**.
 
-**What this demo shows (all implemented):** policy review, verdict, artifacts, auto-fix suggest, and comment generation. See [README.md](README.md) for full "What We Have" / "What We Don't Have".
+**What this demo shows (all implemented):** policy review, verdict, severity breakdown, artifacts, auto-fix suggest, and comment generation. See [README.md](../README.md) for full "What Works Today" and "Implemented vs Planned".
 
 ---
 
@@ -31,16 +31,18 @@ python -m ai_devsecops_agent.cli review \
   --pipeline examples/insecure-gitlab-ci.yml \
   --gitops examples/insecure-argo-application.yaml \
   --policy policies/fedramp-moderate.yaml \
+  --include-comments \
+  --include-remediations \
   --output markdown \
   --out report.md \
   --artifact-dir artifacts
 ```
 
-### Step 2 — Show output
+### Step 2 — Inspect output
 
-- **Findings** — plaintext secrets, unpinned images, missing SBOM
+- **Findings** — plaintext secrets, unpinned images, missing SBOM, risky Argo sync
 - **Verdict** — FAIL / PASS WITH WARNINGS / PASS
-- **Severity breakdown** — critical, high, medium, low
+- **Severity breakdown** — critical, high, medium, low (in `artifacts/policy-summary.json`)
 - **Artifacts** — `review-result.json`, `comments.json`, `remediations.json`
 
 ```bash
@@ -60,8 +62,8 @@ python -m ai_devsecops_agent.cli auto-fix \
 Example:
 
 ```diff
-- image: alpine:latest
-+ image: alpine@sha256:<resolve-digest>
+- image: node:latest
++ image: node:18.17.0
 
 - uses: actions/checkout@v4
 + uses: actions/checkout@<full-40-char-sha>
