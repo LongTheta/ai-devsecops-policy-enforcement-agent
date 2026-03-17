@@ -1,5 +1,11 @@
 # AI DevSecOps Policy Enforcement Agent
 
+[![Tests](https://github.com/LongTheta/ai-devsecops-policy-enforcement-agent/actions/workflows/test.yml/badge.svg)](https://github.com/LongTheta/ai-devsecops-policy-enforcement-agent/actions/workflows/test.yml)
+[![Policy Review](https://github.com/LongTheta/ai-devsecops-policy-enforcement-agent/actions/workflows/policy-review.yml/badge.svg)](https://github.com/LongTheta/ai-devsecops-policy-enforcement-agent/actions/workflows/policy-review.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
+[![Demo: GitHub + Argo](https://img.shields.io/badge/demo-GitHub%20%2B%20Argo-24292e?logo=github)](https://github.com/LongTheta/demo-github-argo-insecure-app)
+[![Demo: GitLab + Argo](https://img.shields.io/badge/demo-GitLab%20%2B%20Argo-fc6d26?logo=gitlab)](https://gitlab.com/cathcampbell/demo-gitlab-argo-insecure-app)
+
 **A workflow-integrated policy enforcement engine for CI/CD and GitOps.** Deterministic analysis, compliance-aware rules, and reviewable auto-fix. DevSecOps and GitOps aware — not a prototype.
 
 ---
@@ -112,16 +118,93 @@ Or run `--mode patch --output-dir artifacts/fixes` to write patched copies.
 
 ---
 
+## Example Auto-Fix
+
+Auto-fix is **deterministic, scoped, and reviewable** — not freeform AI rewriting. It applies policy-aware patches for known patterns (unpinned images, missing resource limits, risky Argo sync, etc.).
+
+**Before** (insecure):
+
+```yaml
+containers:
+  - name: app
+    image: node:latest
+```
+
+**After** (pinned):
+
+```diff
+- image: node:latest
++ image: node:18.17.0
+```
+
+**Why it matters:** Unpinned tags (`:latest`) break reproducibility and supply-chain audit. Pinning to a specific version enables deterministic builds and compliance evidence.
+
+**Three modes:**
+
+| Mode | Behavior |
+|------|----------|
+| `suggest` | Output diff to stdout; no file changes |
+| `patch` | Write patched copies to `--output-dir` for review |
+| `apply` | Modify originals (safe fixes only); creates backups |
+
+---
+
+## Before → After Workflow
+
+End-to-end flow for reviewers and demos:
+
+1. **Run review** — `review-all` (or `review` for local files)
+   ```bash
+   python -m ai_devsecops_agent.cli review-all --platform gitlab \
+     --pipeline examples/insecure-gitlab-ci.yml \
+     --gitops examples/insecure-argo-application.yaml \
+     --policy policies/fedramp-moderate.yaml --artifact-dir artifacts/
+   ```
+
+2. **Inspect findings** — Verdict, risk score, severity breakdown in `artifacts/review-result.json` and `artifacts/policy-summary.json`
+
+3. **Run auto-fix suggest** — See proposed changes without modifying files
+   ```bash
+   python -m ai_devsecops_agent.cli auto-fix --input artifacts/review-result.json --mode suggest
+   ```
+
+4. **Inspect diff** — Review the generated patch output
+
+5. **Optionally patch or apply** — Write fixes to output dir or apply safe fixes with backups
+   ```bash
+   python -m ai_devsecops_agent.cli auto-fix --input artifacts/review-result.json --mode patch --output-dir artifacts/fixes
+   ```
+
+6. **Re-run review** — Validate improvement
+   ```bash
+   python -m ai_devsecops_agent.cli review --platform gitlab \
+     --pipeline artifacts/fixes/<patched-file> \
+     --gitops artifacts/fixes/<patched-gitops> \
+     --policy policies/fedramp-moderate.yaml --artifact-dir artifacts/
+   ```
+
+---
+
+## What This Demonstrates
+
+- **DevSecOps policy enforcement** across CI/CD and GitOps — pipelines, Argo CD, Kubernetes
+- **Deterministic remediation** and safe auto-fix — scoped patches, not freeform rewriting
+- **Workflow-integrated security feedback** — artifacts, PR/MR comments, CI pass/fail
+- **Compliance-aware platform engineering** — policy-driven rules, verdicts, severity breakdown
+- **Practical automation beyond static analysis** — remediation suggestions, auto-fix modes, reviewable diffs
+
+---
+
 ## Demo Repositories
 
-These repos are used or planned to validate the engine in real pipeline workflows:
+Part of the system ecosystem — use these to validate the engine in real pipeline workflows:
 
-| Repository | Purpose |
-|------------|---------|
-| **demo-gitlab-argo-insecure-app** | GitLab CI + Argo CD + Kubernetes example with intentional security and policy violations. Demonstrates pipeline enforcement, findings, remediation, and artifacts. |
-| **demo-github-argo-insecure-app** | GitHub Actions + Argo CD example. Demonstrates cross-platform support and PR workflow integration. |
-| **demo-supply-chain-broken-build** | Example missing SBOM, provenance, and signing. Demonstrates supply chain policy enforcement. |
-| **demo-fixed-vs-broken** | Side-by-side insecure vs remediated configurations. Demonstrates auto-fix and improvement validation. |
+| Demo | Link | Purpose |
+|------|------|---------|
+| **GitHub + Argo** | [demo-github-argo-insecure-app](https://github.com/LongTheta/demo-github-argo-insecure-app) | GitHub Actions + Argo CD with intentional violations. Cross-platform support, PR workflow integration. |
+| **GitLab + Argo** | [demo-gitlab-argo-insecure-app](https://gitlab.com/cathcampbell/demo-gitlab-argo-insecure-app) | GitLab CI + Argo CD + Kubernetes. Pipeline enforcement, findings, remediation, artifacts. |
+| **Supply chain** | demo-supply-chain-broken-build | Missing SBOM, provenance, signing. Supply chain policy enforcement. |
+| **Fixed vs broken** | demo-fixed-vs-broken | Side-by-side insecure vs remediated. Auto-fix and improvement validation. |
 
 **Built-in examples** in this repo (same validation strategy):
 
