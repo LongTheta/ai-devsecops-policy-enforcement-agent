@@ -4,6 +4,20 @@ The auto-fix layer generates safe, reviewable configuration patches for common C
 
 ---
 
+## What We Have
+
+| Fix Type | Can Auto-Apply |
+|----------|----------------|
+| `add_resource_limits` | ✅ Yes |
+| `disable_risky_argo_autosync` | ✅ Yes |
+| `add_sbom_step` | ✅ Yes |
+| `pin_container_image` | ❌ No (suggest only; needs digest) |
+| `pin_github_action` | ❌ No (suggest only; needs SHA) |
+
+**Modes:** `suggest` (no changes) | `patch` (write to output dir) | `apply` (only safe fixes, creates backups)
+
+---
+
 ## Modes
 
 | Mode | Behavior |

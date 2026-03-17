@@ -133,11 +133,15 @@ See [.github/workflows/policy-review.yml](../.github/workflows/policy-review.yml
 
 ---
 
-## What Is Stubbed
+## What We Have
 
-| Capability | Status |
-|------------|--------|
-| Post PR comment from CI | ✅ Implemented (`comments --post`) |
-| Line-level review comments | 🔲 Stubbed |
-| PR check status API | 🔲 Stubbed |
-| Auto-fetch pipeline from PR | ✅ Use `review-all --owner/--repo/--pr` |
+- Policy review job in GitHub Actions
+- Artifact upload (review-result.json, report.md, github-comments.json)
+- Policy-based pass/fail (exit 1 on verdict fail)
+- Post PR comment (`comments --post` with `GITHUB_TOKEN`)
+- Fetch pipeline from PR (`review-all --owner/--repo/--pr`)
+
+## What We Don't Have (Yet)
+
+- Line-level review comments
+- PR check status API

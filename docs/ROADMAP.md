@@ -64,13 +64,14 @@ This document tracks implemented features, near-term goals, and future work for 
 
 ---
 
-## Stubbed
+## Not Yet Implemented
 
-| Capability | Status | Notes |
-|------------|--------|-------|
-| Line-level diff comments | 🔲 | Future: post comments on specific lines |
-| PR/MR check status API | 🔲 | Future: set check status (e.g. "Policy: Fail") |
-| Auto-fetch pipeline from PR | ✅ Wired | Use `review-all --owner/--repo/--pr` |
+| Capability | Notes |
+|------------|-------|
+| Line-level diff comments | Post comments on specific lines in PR/MR |
+| PR/MR check status API | Set check status (e.g. "Policy: Fail") |
+| Auto-fix commit bot | Git-based apply (create branch, open PR) |
+| Digest/SHA resolution | Docker API for images; GitHub API for actions |
 
 ---
 

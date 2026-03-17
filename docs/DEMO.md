@@ -1,115 +1,91 @@
-# 5-Minute Demo Script
+# 2–5 Minute Demo
 
 Use this for **interviews**, **presentations**, or **internal demos**.
 
----
-
-## Setup
-
-```bash
-pip install -e ".[dev]"
-# or: uv sync --all-extras
-```
-
-If using `uv` without global install, prefix commands with `uv run`:
-```bash
-uv run ai-devsecops-agent review ...
-```
+**What this demo shows (all implemented):** policy review, verdict, artifacts, auto-fix suggest, and comment generation. See [README.md](README.md) for full "What We Have" / "What We Don't Have".
 
 ---
 
-## Step 1 — Show the Problem
-
-Open an insecure pipeline:
+## Quick Run
 
 ```bash
-cat examples/insecure-gitlab-ci.yml
-```
+# Bash (Linux/macOS)
+./scripts/demo.sh
 
-**Say:** *"This looks normal, but it's missing key DevSecOps controls"*
+# PowerShell (Windows)
+./scripts/demo.ps1
+```
 
 ---
 
-## Step 2 — Run the Agent
+## 2-Minute Flow (Manual)
+
+### Step 1 — Run review
 
 ```bash
-ai-devsecops-agent review \
+pip install -e .
+mkdir -p artifacts
+
+python -m ai_devsecops_agent.cli review \
   --platform gitlab \
   --pipeline examples/insecure-gitlab-ci.yml \
   --gitops examples/insecure-argo-application.yaml \
   --policy policies/fedramp-moderate.yaml \
   --output markdown \
-  --out report.md
+  --out report.md \
+  --artifact-dir artifacts
 ```
 
----
+### Step 2 — Show output
 
-## Step 3 — Show Output
+- **Findings** — plaintext secrets, unpinned images, missing SBOM
+- **Verdict** — FAIL / PASS WITH WARNINGS / PASS
+- **Severity breakdown** — critical, high, medium, low
+- **Artifacts** — `review-result.json`, `comments.json`, `remediations.json`
 
 ```bash
-cat report.md
+head -60 report.md
 ```
 
-**Walk through:**
-- 🔴 **Findings** — missing SBOM, unpinned image, plaintext secret
-- 🟡 **Policy verdict** — FAIL or WARN
-- 📋 **Compliance mappings** — control families (AC, AU, CM, etc.)
-
----
-
-## Step 4 — Show Remediation
+### Step 3 — Auto-fix (suggest)
 
 ```bash
-ai-devsecops-agent remediate \
-  --pipeline examples/insecure-gitlab-ci.yml \
-  --gitops examples/insecure-argo-application.yaml \
-  --include-patch \
-  --out remediations.md
-cat remediations.md
+python -m ai_devsecops_agent.cli auto-fix \
+  --input artifacts/review-result.json \
+  --mode suggest
 ```
 
-**Highlight:**
+### Step 4 — Show diff
+
+Example:
+
 ```diff
-- image: node:latest
-+ image: node@sha256:...
-```
+- image: alpine:latest
++ image: alpine@sha256:<resolve-digest>
 
-**Say:** *"It doesn't just detect issues — it tells developers exactly how to fix them"*
+- uses: actions/checkout@v4
++ uses: actions/checkout@<full-40-char-sha>
+```
 
 ---
 
-## Step 5 — Show PR Comments
+## 5-Minute Flow (Full)
 
-```bash
-ai-devsecops-agent comments \
-  --pipeline examples/insecure-gitlab-ci.yml \
-  --gitops examples/insecure-argo-application.yaml \
-  --policy policies/fedramp-moderate.yaml \
-  --type grouped \
-  --format github
-```
-
-Or view pre-generated examples:
-```bash
-cat examples/github-review-comments.md
-cat examples/gitlab-review-comments.md
-```
-
-**Say:** *"This can plug directly into PR workflows"*
+1. **Show the problem** — `cat examples/insecure-gitlab-ci.yml`
+2. **Run review** — as above
+3. **Show output** — `cat report.md`
+4. **Auto-fix suggest** — as above
+5. **PR comments** — `python -m ai_devsecops_agent.cli comments --pipeline examples/insecure-gitlab-ci.yml --gitops examples/insecure-argo-application.yaml --type summary --format github`
 
 ---
 
-## Step 6 — Close Strong
+## Framing
 
-**Say this:**
-
-> "This system bridges the gap between security policy and developer workflows — it doesn't only detect issues, it enforces decisions and enables remediation across CI/CD and GitOps."
+- **Don't say:** "AI tool"
+- **Say:** "Policy enforcement engine with deterministic analysis and reviewable auto-fix"
 
 ---
 
-## Framing Tip
+## Close
 
-👉 **Don't say:** "AI tool"  
-👉 **Say:** *"Policy enforcement engine with AI-assisted remediation"*
-
-That framing is **way stronger**.
+> "This system bridges the gap between security policy and developer workflows — it enforces decisions and enables remediation across CI/CD and GitOps."

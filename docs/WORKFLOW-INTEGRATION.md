@@ -4,6 +4,23 @@ This document explains how the AI DevSecOps Policy Enforcement Agent fits into r
 
 ---
 
+## What We Have
+
+| Capability | Status |
+|------------|--------|
+| Artifact generation | ✅ `review-result.json`, `policy-summary.json`, `comments.json`, `remediations.json`, `workflow-status.json` |
+| Event context detection | ✅ Auto-detects `GITHUB_*`, `CI_*` env vars |
+| GitHub/GitLab payload formatting | ✅ `format_comment_payload()`, `format_review_payload()` |
+| Post PR/MR comment | ✅ `post_pr_comment()`, `post_mr_comment()` |
+| Fetch pipeline from PR/MR | ✅ `review-all --owner/--repo/--pr` or `--project/--mr` |
+
+## What We Don't Have (Yet)
+
+- Line-level diff comments
+- PR/MR check status API (e.g. set "Policy: Fail" on status check)
+
+---
+
 ## Overview
 
 The agent is designed to participate in actual review and delivery flows:
@@ -29,13 +46,12 @@ The agent is designed to participate in actual review and delivery flows:
 
 ---
 
-## What Is Stubbed
+## What Is Stubbed / Planned
 
 | Capability | Status | Notes |
 |------------|--------|-------|
 | Line-level diff comments | 🔲 | Future: post comments on specific lines |
 | PR/MR check status API | 🔲 | Future: set check status (e.g. "Policy: Fail") |
-| Auto-fetch pipeline from PR | ✅ | Use `review-all --owner/--repo/--pr` |
 
 ---
 

@@ -4,6 +4,24 @@
 
 This folder contains documentation for the AI DevSecOps Policy Enforcement Agent.
 
+## What We Have
+
+| Area | Implemented |
+|------|-------------|
+| **Analysis** | Pipeline (GitLab CI, GitHub Actions), GitOps (Argo CD, K8s), SBOM, cross-system |
+| **Policy** | YAML-based rules, verdict (pass/fail/warnings), compliance mapping |
+| **Outputs** | Markdown, JSON, SARIF, artifacts (review-result.json, comments.json, remediations.json) |
+| **Comments** | PR/MR comment generation (GitHub/GitLab formats); live posting with token |
+| **Auto-fix** | suggest, patch, apply modes; 3 safe fixers (resource limits, Argo sync, SBOM); 2 suggest-only (pin image, pin action) |
+| **Workflow** | Remote fetch from PR/MR (`review-all`), artifact generation, CI integration |
+
+## What We Don't Have (Yet)
+
+- Line-level diff comments
+- PR/MR check status API
+- Auto-fix commit bot (Git-based apply)
+- Digest/SHA resolution for pin fixers (Docker/GitHub API)
+
 ## Documents
 
 | Document | Description |

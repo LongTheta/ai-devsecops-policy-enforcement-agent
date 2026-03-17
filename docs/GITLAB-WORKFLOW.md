@@ -105,11 +105,15 @@ See [.gitlab-ci.yml](../.gitlab-ci.yml) for the `policy-review` job used in this
 
 ---
 
-## What Is Stubbed
+## What We Have
 
-| Capability | Status |
-|------------|--------|
-| Post MR comment from CI | ✅ Implemented (`comments --post`) |
-| Line-level diff comments | 🔲 Stubbed |
-| MR check status API | 🔲 Stubbed |
-| Auto-fetch pipeline from MR | ✅ Use `review-all --project/--mr` |
+- Policy review job in GitLab CI
+- Artifact retention (review-result.json, report.md, gitlab-comments.json)
+- Policy-based pass/fail (allow_failure: false)
+- Post MR comment (`comments --post` with `GITLAB_TOKEN`)
+- Fetch pipeline from MR (`review-all --project/--mr`)
+
+## What We Don't Have (Yet)
+
+- Line-level diff comments
+- MR check status API

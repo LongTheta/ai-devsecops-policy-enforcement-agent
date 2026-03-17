@@ -1,6 +1,172 @@
 # AI DevSecOps Policy Enforcement Agent
 
-**AI-powered DevSecOps agent that analyzes CI/CD pipelines and GitOps workflows to enforce security, compliance, and supply chain policies with actionable remediation guidance.**
+**A workflow-integrated policy enforcement engine for CI/CD and GitOps.** Deterministic analysis, compliance-aware rules, and reviewable auto-fix. DevSecOps + GitOps aware.
+
+---
+
+## What Works Today
+
+This is a **working system** — not a prototype. Verifiable capabilities (see [docs/ROADMAP.md](docs/ROADMAP.md) for full list):
+
+| Capability | Status |
+|------------|--------|
+| Analyze GitLab CI and GitHub Actions pipelines | ✅ |
+| Analyze Argo CD applications and Kubernetes manifests | ✅ |
+| Enforce policy rules (security, supply chain, compliance-aware) | ✅ |
+| Generate structured outputs (Markdown, JSON, SARIF, artifacts) | ✅ |
+| Generate PR/MR review comments (GitHub/GitLab formats) | ✅ |
+| Generate deterministic remediation suggestions | ✅ |
+| Auto-fix: suggest mode | ✅ |
+| Auto-fix: patch mode (write to output dir) | ✅ |
+| Auto-fix: apply mode (safe fixes only, with backups) | ✅ |
+| Verdict and severity breakdown (pass / fail / warnings) | ✅ |
+| Remote fetch of pipeline from PR/MR | ✅ |
+
+---
+
+## Quick Start (60 seconds)
+
+```bash
+git clone https://github.com/LongTheta/ai-devsecops-policy-enforcement-agent.git
+cd ai-devsecops-policy-enforcement-agent
+pip install -e .
+```
+
+```bash
+python -m ai_devsecops_agent.cli review \
+  --platform gitlab \
+  --pipeline examples/insecure-gitlab-ci.yml \
+  --gitops examples/insecure-argo-application.yaml \
+  --policy policies/default.yaml \
+  --artifact-dir artifacts
+```
+
+Artifacts: `review-result.json`, `policy-summary.json`, `report.md`, `comments.json`, `remediations.json`.
+
+---
+
+## 2-Minute Demo
+
+### Step 1 — Run review
+
+```bash
+python -m ai_devsecops_agent.cli review \
+  --platform gitlab \
+  --pipeline examples/insecure-gitlab-argo-flow/.gitlab-ci.yml \
+  --gitops examples/insecure-gitlab-argo-flow/argo-application.yaml \
+  --manifests examples/insecure-gitlab-argo-flow/deployment.yaml \
+  --policy policies/fedramp-moderate.yaml \
+  --output markdown \
+  --out report.md \
+  --artifact-dir artifacts
+```
+
+### Step 2 — Show output
+
+- **Findings** — plaintext secrets, unpinned images, missing SBOM, risky Argo sync
+- **Verdict** — FAIL / PASS WITH WARNINGS / PASS
+- **Severity breakdown** — critical, high, medium, low
+- **Comments** — `artifacts/comments.json` or `artifacts/github-comments.json`
+- **Remediation** — `artifacts/remediations.json`
+
+### Step 3 — Run auto-fix (suggest)
+
+```bash
+python -m ai_devsecops_agent.cli auto-fix \
+  --input artifacts/review-result.json \
+  --mode suggest
+```
+
+### Step 4 — Show diff
+
+Example output:
+
+```diff
+- image: alpine:latest
++ image: alpine@sha256:<resolve-digest>
+
+- uses: actions/checkout@v4
++ uses: actions/checkout@<full-40-char-sha>
+```
+
+Or run `--mode patch --output-dir artifacts/fixes` to write patched copies.
+
+---
+
+## Demo Examples
+
+Included in this repository:
+
+| Example | Path | Demonstrates |
+|---------|------|--------------|
+| **GitLab CI + Argo CD** | `examples/insecure-gitlab-argo-flow/` | Pipeline enforcement, findings, remediation, artifacts |
+| **GitHub Actions + Argo** | `examples/insecure-github-argo-flow/` | Cross-platform support, PR workflow integration |
+| **Auto-fix targets** | `examples/autofix/` | Unpinned actions, missing SBOM, risky Argo sync, missing resource limits |
+| **Standalone manifests** | `examples/insecure-argo-application.yaml`, `examples/insecure-k8s-deployment.yaml` | GitOps and K8s analysis |
+
+---
+
+## Example Outputs
+
+| File | Demonstrates |
+|------|--------------|
+| [examples/sample-output.md](examples/sample-output.md) | Full Markdown report with findings, verdict, compliance mappings |
+| [examples/sample-output.json](examples/sample-output.json) | Structured JSON output |
+| [examples/github-review-comments.md](examples/github-review-comments.md) | PR-ready comment format (GitHub) |
+| [examples/gitlab-review-comments.md](examples/gitlab-review-comments.md) | MR-ready comment format (GitLab) |
+| [examples/remediation-output.md](examples/remediation-output.md) | Step-by-step remediation with patches |
+| `artifacts/review-result.json` | Produced by `review --artifact-dir`; input for `auto-fix --input` |
+
+---
+
+## Implemented vs Planned
+
+| Capability | Status |
+|------------|--------|
+| Pipeline analysis | ✅ Implemented |
+| GitOps / Argo analysis | ✅ Implemented |
+| Policy enforcement | ✅ Implemented |
+| Remediation suggestions | ✅ Implemented |
+| Auto-fix (suggest / patch / apply) | ✅ Implemented |
+| — Safe to apply: resource limits, Argo sync, SBOM step | ✅ |
+| — Suggest only: pin image, pin action (need digest/SHA) | ✅ |
+| PR/MR comment generation | ✅ Implemented |
+| Live PR/MR posting | ✅ Implemented (requires `GITHUB_TOKEN` or `GITLAB_TOKEN`) |
+| Verdict and severity breakdown | ✅ Implemented |
+| Remote fetch from PR/MR | ✅ Implemented (`review-all`) |
+| Auto-fix commit bot | 🔲 Planned |
+| Compliance evidence generation | 🔲 Planned |
+| Digest/SHA resolution for pin fixers | 🔲 Planned |
+
+---
+
+## How This Fits in a CI/CD Pipeline
+
+1. **Run review** — `review` or `review-all` in CI (GitHub Actions, GitLab CI)
+2. **Generate artifacts** — JSON, Markdown, comments, remediations
+3. **Fail on policy violations** — Exit code 1 when verdict is FAIL
+4. **Generate PR/MR comments** — Use `comments` or post from artifacts
+5. **Optionally run auto-fix** — `auto-fix --mode suggest` or `--mode patch` for reviewable fixes
+
+See [.github/workflows/policy-review.yml](.github/workflows/policy-review.yml) and [docs/WORKFLOW-INTEGRATION.md](docs/WORKFLOW-INTEGRATION.md).
+
+---
+
+## Architecture (High-Level)
+
+```
+Analyzers → Policy Engine → Verdict → Remediation → Auto-Fix → Reporting → Workflow Integration
+```
+
+| Component | Purpose |
+|-----------|---------|
+| **Pipeline analyzer** | GitLab CI, GitHub Actions patterns |
+| **GitOps analyzer** | Argo CD, K8s manifests |
+| **SBOM analyzer** | Supply chain visibility |
+| **Cross-system analyzer** | CI↔GitOps governance gaps |
+| **Policy engine** | YAML-based enforcement |
+| **Auto-fix engine** | Deterministic, policy-aware config patches |
+| **Reporting** | Markdown, JSON, SARIF, console, PR/MR comments |
 
 ---
 
@@ -13,20 +179,7 @@ Modern delivery pipelines are fast — but often lack:
 - **Compliance-aware controls** for audit and governance
 - **Clear promotion and governance boundaries** between environments
 
-Most tools **detect issues** and **generate reports**.
-
-❌ But they don't **enforce decisions** or **help developers fix problems**.
-
----
-
-## What This Project Does
-
-This project turns DevSecOps policies into **automated, enforceable decisions** across:
-
-- **CI/CD pipelines** (GitLab CI, GitHub Actions)
-- **GitOps workflows** (Argo CD)
-- **Kubernetes manifests**
-- **Supply chain security** (SBOM, provenance, signing)
+Most tools **detect issues** and **generate reports**. This system **enforces decisions** and **helps developers fix problems** with deterministic, reviewable auto-fix.
 
 ---
 
@@ -47,175 +200,62 @@ This project turns DevSecOps policies into **automated, enforceable decisions** 
 ### Policy Enforcement
 
 - YAML-based policy engine
-- Supports supply chain, security, and compliance-aware rules
+- Supply chain, security, and compliance-aware rules
 
 **Verdicts:** ✅ Pass | ⚠️ Pass with warnings | ❌ Fail
-
-### Compliance-Aware Mapping
-
-Maps findings to control families such as:
-
-- AC (Access Control) · AU (Audit & Accountability) · CM (Configuration Management)
-- IA (Identification & Authentication) · SC (System Communications Protection) · SI (System Integrity)
-
-> ⚠️ Supports engineering analysis — not formal compliance certification
-
-### Auto-Remediation
-
-- Suggests fixes for common issues
-- Step-by-step guidance, YAML snippets, patch-style diffs
-
-```diff
-- image: node:latest
-+ image: node@sha256:...
-```
 
 ### Policy-Aware Auto-Fix
 
 - **Deterministic, reviewable patches** for common CI/CD, GitOps, and K8s issues
 - **Modes:** `suggest` (no changes) | `patch` (write to output dir) | `apply` (modify originals with backups)
 - **Safety model:** `safe` | `review_required` | `suggest_only` per fix
-- **First-wave fixers:** unpinned image/action, missing resource limits, risky Argo sync, missing SBOM step
 
 ### PR / MR Review Comments
 
-Generates developer-friendly review comments for GitHub PRs and GitLab MRs:
-
-```
-❌ Missing SBOM Generation Step
-
-Severity: High | Category: Supply Chain
-
-Why this matters:
-This pipeline does not generate an SBOM, reducing artifact traceability.
-
-Suggested fix:
-Add a step using Syft or similar tooling to generate an SBOM artifact.
-```
+Generates developer-friendly review comments for GitHub PRs and GitLab MRs. Can post live with `GITHUB_TOKEN` or `GITLAB_TOKEN`.
 
 ---
 
-## Architecture
+## Quick Commands
 
-```
-Analyzers → Policy Engine → Compliance Mapping → Remediation → Reporting
-```
-
-| Component | Purpose |
-|-----------|---------|
-| **Pipeline analyzer** | GitLab CI, GitHub Actions patterns |
-| **GitOps analyzer** | Argo CD, K8s manifests |
-| **SBOM analyzer** | Supply chain visibility |
-| **Cross-system analyzer** | CI↔GitOps governance gaps |
-| **Policy engine** | YAML-based enforcement |
-| **Auto-fix engine** | Deterministic, policy-aware config patches |
-| **Reporting** | Markdown, JSON, SARIF, console, PR/MR comments |
-
----
-
-## Quick Start
+**Review (local files):**
 
 ```bash
-git clone https://github.com/LongTheta/ai-devsecops-policy-enforcement-agent.git
-cd ai-devsecops-policy-enforcement-agent
-pip install -e ".[dev]"
-```
-
-**Run a review (with CI/CD artifacts):**
-
-```bash
-ai-devsecops-agent review \
+python -m ai_devsecops_agent.cli review \
   --platform github \
   --pipeline .github/workflows/ci.yml \
   --gitops k8s/argo-application.yaml \
-  --policy policies/default.yaml \
-  --artifact-dir artifacts/
+  --artifact-dir artifacts
 ```
 
 **Review with remote fetch (PR/MR):**
 
 ```bash
-# GitHub: fetch pipeline from PR and review
-ai-devsecops-agent review-all --owner myorg --repo myrepo --pr 42 --artifact-dir artifacts
+# GitHub
+python -m ai_devsecops_agent.cli review-all --owner org --repo repo --pr 42 --artifact-dir artifacts
 
-# GitLab: fetch pipeline from MR and review
-ai-devsecops-agent review-all --project mygroup/myrepo --mr 10 --artifact-dir artifacts
+# GitLab
+python -m ai_devsecops_agent.cli review-all --project group/repo --mr 10 --artifact-dir artifacts
 ```
 
-**Run a review (GitLab):**
+**Auto-fix:**
 
 ```bash
-ai-devsecops-agent review \
-  --platform gitlab \
-  --pipeline examples/insecure-gitlab-argo-flow/.gitlab-ci.yml \
-  --gitops examples/insecure-gitlab-argo-flow/argo-application.yaml \
-  --manifests examples/insecure-gitlab-argo-flow/deployment.yaml \
-  --policy policies/fedramp-moderate.yaml \
-  --output markdown \
-  --out report.md
-```
+# Suggest (no file changes)
+python -m ai_devsecops_agent.cli auto-fix --input artifacts/review-result.json --mode suggest
 
-**Generate PR/MR comments:**
+# Patch (write to output dir)
+python -m ai_devsecops_agent.cli auto-fix --input artifacts/review-result.json --mode patch --output-dir artifacts/fixes
 
-```bash
-ai-devsecops-agent comments \
-  --pipeline examples/insecure-gitlab-ci.yml \
-  --gitops examples/insecure-argo-application.yaml \
-  --type grouped \
-  --format github \
-  --out pr-comment.md
-```
-
-**Get remediation suggestions with patches:**
-
-```bash
-ai-devsecops-agent remediate \
-  --pipeline examples/insecure-gitlab-ci.yml \
-  --gitops examples/insecure-argo-application.yaml \
-  --include-patch \
-  --out remediations.md
-```
-
-**Auto-fix (suggest → patch → apply):**
-
-```bash
-# Suggest fixes (no file changes)
-ai-devsecops-agent auto-fix \
-  --pipeline examples/insecure-github-actions.yml \
-  --gitops examples/insecure-argo-application.yaml \
-  --manifests examples/insecure-k8s-deployment.yaml \
-  --mode suggest
-
-# Write patched copies to output directory
-ai-devsecops-agent auto-fix \
-  --input artifacts/review-result.json \
-  --mode patch \
-  --output-dir artifacts/fixes
-
-# Apply safe fixes to originals (creates backups)
-ai-devsecops-agent auto-fix \
-  --pipeline examples/autofix/insecure-pipeline-for-autofix.yml \
-  --gitops examples/autofix/insecure-argo-for-autofix.yaml \
-  --manifests examples/autofix/insecure-for-autofix.yaml \
-  --mode apply \
-  --only-safe
+# Apply (safe fixes only, creates backups)
+python -m ai_devsecops_agent.cli auto-fix --pipeline examples/autofix/insecure-pipeline-for-autofix.yml \
+  --gitops examples/autofix/insecure-argo-for-autofix.yaml --manifests examples/autofix/insecure-for-autofix.yaml \
+  --mode apply --only-safe
 ```
 
 ---
 
-## Example Output
-
-| Output | Path |
-|--------|------|
-| Full report (Markdown) | [examples/sample-output.md](examples/sample-output.md) |
-| JSON report | [examples/sample-output.json](examples/sample-output.json) |
-| GitHub PR comments | [examples/github-review-comments.md](examples/github-review-comments.md) |
-| GitLab MR comments | [examples/gitlab-review-comments.md](examples/gitlab-review-comments.md) |
-| Remediation suggestions | [examples/remediation-output.md](examples/remediation-output.md) |
-
-## 5-Minute Demo
-
-Run the interactive demo for interviews or presentations:
+## 5-Minute Demo (Interactive)
 
 ```bash
 # Bash (Linux/macOS)
@@ -225,32 +265,18 @@ Run the interactive demo for interviews or presentations:
 ./scripts/demo.ps1
 ```
 
-Or follow the step-by-step guide: [docs/DEMO.md](docs/DEMO.md)
+Step-by-step guide: [docs/DEMO.md](docs/DEMO.md)
 
 ---
 
 ## Workflow Integration
 
-The agent plugs into real CI/CD and PR/MR workflows:
+- **Artifact generation** — `--artifact-dir` writes `review-result.json`, `policy-summary.json`, `comments.json`, `remediations.json`, `workflow-status.json`
+- **GitHub Actions** — [.github/workflows/policy-review.yml](.github/workflows/policy-review.yml)
+- **GitLab CI** — [examples/workflows/gitlab-policy-review.yml](examples/workflows/gitlab-policy-review.yml)
+- **Post comments** — `comments --post` with `GITHUB_TOKEN` or `GITLAB_TOKEN`
 
-- **Artifact generation** – `--artifact-dir` writes `review-result.json`, `policy-summary.json`, `comments.json`, `remediations.json`, `workflow-status.json`
-- **GitHub Actions** – See [.github/workflows/policy-review.yml](.github/workflows/policy-review.yml)
-- **GitLab CI** – See [examples/workflows/gitlab-policy-review.yml](examples/workflows/gitlab-policy-review.yml)
-- **Post comments** – `comments --post` with `GITHUB_TOKEN` or `GITLAB_TOKEN`
-
-See [docs/WORKFLOW-INTEGRATION.md](docs/WORKFLOW-INTEGRATION.md) for details.
-
----
-
-## Example Use Cases
-
-- 🔍 Review CI/CD pipelines before merge
-- 🔐 Enforce supply chain policies
-- ⚙️ Validate GitOps deployment safety
-- 🧾 Generate compliance-aware reports
-- 🛠 Suggest fixes for insecure configurations
-- 🔧 Auto-fix common issues (suggest, patch, or apply)
-- 💬 Post review comments to PRs/MRs (GitHub, GitLab)
+See [docs/WORKFLOW-INTEGRATION.md](docs/WORKFLOW-INTEGRATION.md).
 
 ---
 
@@ -258,9 +284,30 @@ See [docs/WORKFLOW-INTEGRATION.md](docs/WORKFLOW-INTEGRATION.md) for details.
 
 - **Policy-driven, not hardcoded** — Rules live in YAML
 - **Deterministic first, AI-assisted second** — Predictable, auditable results
-- **Separation of concerns** — Analyzers, policy, remediation, reporting
-- **Extensible** — GitLab, GitHub, Argo CD integrations (fetch, post comments)
-- **Compliance-aware but not compliance theater** — Engineering guidance, not certification
+- **Workflow-integrated** — Drops into CI/CD pipelines
+- **Reviewable and safe auto-fix** — No freeform rewriting
+
+---
+
+## CLI Reference
+
+| Command | Purpose |
+|---------|---------|
+| `review` | Full policy review; Markdown, JSON, SARIF, artifacts |
+| `review-all` | Review with optional remote fetch from PR/MR |
+| `comments` | Generate PR/MR comments; optional `--post` |
+| `remediate` | Remediation suggestions with patches |
+| `auto-fix` | Generate or apply config patches (suggest \| patch \| apply) |
+
+---
+
+## Roadmap
+
+- [x] PR/MR integration, SARIF, auto-fix, review-all
+- [ ] SBOM MCP tool, evaluation history, observability
+- [ ] Auto-fix commit bot, compliance evidence generator
+
+See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ---
 
@@ -271,52 +318,6 @@ See [docs/WORKFLOW-INTEGRATION.md](docs/WORKFLOW-INTEGRATION.md) for details.
 
 ---
 
-## Roadmap
-
-### Near-term ✅
-
-- [x] PR/MR API integration (post comments)
-- [x] SARIF output for GitHub Advanced Security, GitLab SAST
-- [x] Policy-aware auto-fix (suggest, patch, apply)
-- [x] Unified `review-all` with remote fetch
-
-### Mid-term
-
-- [ ] SBOM MCP tool
-- [ ] Evaluation history + trend tracking
-- [ ] Observability (OTel / Logfire)
-
-### Advanced
-
-- [ ] Auto-fix commit bot (Git-based apply)
-- [ ] Digest/SHA resolution (Docker + GitHub API) for pin fixers
-- [ ] Compliance evidence generator
-- [ ] Drift detection across CI → GitOps → runtime
-
-See [docs/ROADMAP.md](docs/ROADMAP.md) for full details.
-
----
-
-## CLI Reference
-
-| Command | Purpose |
-|---------|---------|
-| `review` | Run full policy review; output Markdown, JSON, SARIF, or console |
-| `review-all` | Review with optional remote fetch of pipeline from PR/MR |
-| `comments` | Generate PR/MR review comments; optional `--post` to publish |
-| `remediate` | Output remediation suggestions with optional patch-style diffs |
-| `auto-fix` | Generate or apply safe config patches (suggest \| patch \| apply) |
-
-See `ai-devsecops-agent --help` and [docs/COMPONENTS.md](docs/COMPONENTS.md) for details.
-
----
-
 ## Disclaimer
 
 This project provides **engineering guidance and policy enforcement support**. It is not a substitute for formal security audits or compliance certification.
-
----
-
-## One-Liner
-
-**Turn DevSecOps policies into enforceable, automated decisions across your delivery pipeline.**
