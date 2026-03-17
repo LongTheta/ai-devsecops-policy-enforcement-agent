@@ -3,15 +3,29 @@
 import re
 from typing import Any
 
-from ai_devsecops_agent.models import Finding, RemediationSuggestion, SuggestedPatch
+from ai_devsecops_agent.models import (
+    Finding,
+    RemediationBundle,
+    RemediationSuggestion,
+    ReviewResult,
+    SuggestedPatch,
+)
 
+# Minimum confidence to return remediation; "low" with no template returns None
+_MIN_CONFIDENCE = "low"
+
+# Snippet prefix to label examples (do not apply verbatim)
+_SNIPPET_LABEL = "# EXAMPLE - adjust for your environment; do not apply verbatim\n"
 
 # Registry: finding_id -> RemediationSuggestion template (without applies_to_finding_id)
+# Optional keys: title, limitations (list)
 _REMEDIATION_REGISTRY: dict[str, dict[str, Any]] = {
     # --- Plaintext secrets ---
     "pipeline-001": {
+        "title": "Replace plaintext secrets with CI/CD variables",
         "summary": "Remove plaintext secrets; use CI/CD secret variables or vault",
         "rationale": "Hardcoded credentials can be exfiltrated via repo access, logs, or artifact leaks. Use masked variables or a secrets manager.",
+        "limitations": ["Requires org-specific secret store configuration; cannot auto-edit files."],
         "steps": [
             "Remove the plaintext value from the pipeline/config file.",
             "Add the secret to GitLab CI/CD variables (masked), GitHub Actions secrets, or HashiCorp Vault.",
@@ -67,7 +81,9 @@ _REMEDIATION_REGISTRY: dict[str, dict[str, Any]] = {
     },
     # --- Unpinned container image ---
     "pipeline-002": {
+        "title": "Pin container images by digest",
         "summary": "Pin container images by digest",
+        "limitations": ["Digest must be resolved manually; patch shows pattern only."],
         "rationale": "Unpinned images (e.g. :latest) can change without notice, breaking builds or introducing vulnerabilities.",
         "steps": [
             "Resolve the image to a specific digest: docker pull image:tag && docker inspect --format='{{.RepoDigests}}'.",
@@ -109,7 +125,9 @@ _REMEDIATION_REGISTRY: dict[str, dict[str, Any]] = {
         "is_organization_specific": True,
     },
     "argo-001": {
+        "title": "Restrict Argo CD automated sync",
         "summary": "Disable prune and selfHeal for production, or use manual sync",
+        "limitations": ["Placement depends on your Argo Application structure."],
         "rationale": "Both prune and selfHeal together increase drift/override risk without explicit approval.",
         "steps": [
             "Set prune: false and selfHeal: false for production apps.",
@@ -289,6 +307,21 @@ _REMEDIATION_REGISTRY: dict[str, dict[str, Any]] = {
         "confidence": "high",
         "notes": "Organization-specific: create project in your Argo CD.",
         "is_organization_specific": True,
+    },
+    "gitops-005": {
+        "title": "Set imagePullPolicy for mutable tags",
+        "summary": "Use imagePullPolicy: Always when using mutable tags or :latest",
+        "rationale": "IfNotPresent (default) can cache stale images; Always ensures fresh pull for mutable tags.",
+        "steps": [
+            "Add imagePullPolicy: Always to containers using :latest or mutable tags.",
+            "Or pin by digest and use IfNotPresent.",
+        ],
+        "snippet": "containers:\n  - name: app\n    image: myapp:latest\n    imagePullPolicy: Always",
+        "patch": None,
+        "confidence": "high",
+        "limitations": ["Placement depends on container structure."],
+        "notes": "Prefer pinning by digest over Always.",
+        "is_organization_specific": False,
     },
     "gitops-004": {
         "summary": "Add pod securityContext",
@@ -471,8 +504,52 @@ _REMEDIATION_REGISTRY: dict[str, dict[str, Any]] = {
 }
 
 
+# Category-based fallback for unknown finding IDs (generic guidance only)
+_CATEGORY_FALLBACK: dict[str, dict[str, Any]] = {
+    "secrets": {
+        "title": "Address secret exposure",
+        "summary": "Remove hardcoded secrets; use CI/CD variables or vault.",
+        "rationale": "Secrets in config files can be exfiltrated.",
+        "steps": ["Remove plaintext value.", "Store in approved secret store.", "Reference via variable."],
+        "snippet": "# Use ${VAR} or ${{ secrets.VAR }}",
+        "confidence": "low",
+        "limitations": ["Generic guidance; org-specific implementation required."],
+        "is_organization_specific": True,
+    },
+    "supply_chain": {
+        "title": "Improve supply chain controls",
+        "summary": "Add SBOM, pin dependencies, or add signing.",
+        "rationale": "Supply chain visibility and integrity matter.",
+        "steps": ["Review finding description.", "Add SBOM or pin by digest where applicable."],
+        "snippet": "# Add syft/cyclonedx step or pin image@sha256:...",
+        "confidence": "low",
+        "limitations": ["Generic guidance; apply based on context."],
+        "is_organization_specific": False,
+    },
+    "gitops": {
+        "title": "Harden GitOps configuration",
+        "summary": "Adjust sync policy, resources, or security context.",
+        "rationale": "GitOps config affects deployment safety.",
+        "steps": ["Review finding.", "Adjust syncPolicy, resources, or securityContext as needed."],
+        "snippet": "# See finding description for specifics",
+        "confidence": "low",
+        "limitations": ["Generic guidance; apply based on manifest structure."],
+        "is_organization_specific": False,
+    },
+}
+
+
 def _generate_patch_for_finding(finding: Finding) -> str | None:
     """Generate a patch-style diff when we can infer the fix from evidence or template."""
+
+    # Argo CD syncPolicy - generic patch
+    if finding.id == "argo-001":
+        return """   syncPolicy:
+     automated:
+-      prune: true
+-      selfHeal: true
++      prune: false
++      selfHeal: false"""
 
     # K8s resources - generic patch, no evidence needed
     if finding.id == "gitops-003":
@@ -517,31 +594,73 @@ def _generate_patch_for_finding(finding: Finding) -> str | None:
             return f"""- uses: {action}@v4
 + uses: {action}@<full-40-char-sha>"""
 
+    # imagePullPolicy: add Always when using mutable tags
+    if finding.id == "gitops-005":
+        return """         - name: app
++          imagePullPolicy: Always
+            image: myapp:latest"""
+
     return None
 
 
-def generate_remediation(finding: Finding) -> RemediationSuggestion | None:
+def _get_template_for_finding(finding: Finding) -> dict[str, Any] | None:
+    """Get remediation template by finding ID, or category fallback."""
+    template = _REMEDIATION_REGISTRY.get(finding.id)
+    if template:
+        return template
+    return _CATEGORY_FALLBACK.get(finding.category)
+
+
+def generate_remediation(
+    finding: Finding,
+    *,
+    min_confidence: str = _MIN_CONFIDENCE,
+    use_category_fallback: bool = True,
+) -> RemediationSuggestion | None:
     """
     Generate full remediation guidance for a finding.
     Uses deterministic rules/templates; no file editing.
+    Returns None when no template and no category fallback, or confidence below threshold.
     """
     template = _REMEDIATION_REGISTRY.get(finding.id)
+    if not template and use_category_fallback:
+        template = _CATEGORY_FALLBACK.get(finding.category)
     if not template:
         return None
+
+    confidence = template.get("confidence", "medium")
+    conf_order = ("low", "medium", "high")
+    try:
+        c_idx = conf_order.index(confidence) if confidence in conf_order else 0
+        m_idx = conf_order.index(min_confidence) if min_confidence in conf_order else 0
+        if c_idx < m_idx:
+            return None
+    except ValueError:
+        pass
 
     patch = template.get("patch")
     if patch is None:
         patch = _generate_patch_for_finding(finding)
 
+    snippet = template.get("snippet")
+    if snippet and not snippet.strip().startswith("# EXAMPLE"):
+        snippet = _SNIPPET_LABEL + snippet
+
+    limitations = list(template.get("limitations", []))
+    if template.get("is_organization_specific"):
+        limitations.append("Organization-specific implementation required.")
+
     return RemediationSuggestion(
         id=f"rem-{finding.id}",
         applies_to_finding_id=finding.id,
+        title=template.get("title") or finding.title,
         summary=template["summary"],
         rationale=template["rationale"],
         steps=template.get("steps", []),
-        snippet=template.get("snippet"),
+        snippet=snippet,
         patch=patch,
-        confidence=template.get("confidence", "medium"),
+        confidence=confidence,
+        limitations=limitations,
         notes=template.get("notes"),
         is_organization_specific=template.get("is_organization_specific", False),
     )
@@ -560,4 +679,36 @@ def generate_patch(finding: Finding) -> SuggestedPatch | None:
         description=rem.summary,
         confidence=rem.confidence,
         notes=rem.notes,
+    )
+
+
+def generate_remediation_bundle(result: ReviewResult) -> RemediationBundle:
+    """
+    Generate a bundled remediation output for a full review result.
+    Does not auto-edit files; outputs guidance and patches only.
+    """
+    remediations: list[RemediationSuggestion] = []
+    patches: list[SuggestedPatch] = []
+    limitations = [
+        "No automatic file editing; apply changes manually.",
+        "Snippets and patches are examples; adjust for your environment.",
+    ]
+
+    for finding in result.findings:
+        rem = generate_remediation(finding)
+        if rem:
+            remediations.append(rem)
+            if rem.patch:
+                p = generate_patch(finding)
+                if p:
+                    patches.append(p)
+
+    return RemediationBundle(
+        id="remediation-bundle",
+        finding_count=len(result.findings),
+        remediation_count=len(remediations),
+        patch_count=len(patches),
+        remediations=remediations,
+        patches=patches,
+        limitations=limitations,
     )

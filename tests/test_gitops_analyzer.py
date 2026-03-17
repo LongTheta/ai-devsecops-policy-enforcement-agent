@@ -38,6 +38,23 @@ def test_analyze_k8s_missing_limits():
     assert any("limit" in f.title.lower() or "resource" in f.title.lower() for f in findings)
 
 
+def test_analyze_image_pull_policy():
+    """Deployment with :latest and no imagePullPolicy triggers gitops-005."""
+    content = """
+    apiVersion: apps/v1
+    kind: Deployment
+    spec:
+      template:
+        spec:
+          containers:
+            - name: app
+              image: myapp:latest
+    """
+    findings = analyze_gitops(content=content)
+    ids = [f.id for f in findings]
+    assert "gitops-005" in ids
+
+
 def test_analyze_example_argo():
     path = Path("examples/insecure-argo-application.yaml")
     if not path.exists():

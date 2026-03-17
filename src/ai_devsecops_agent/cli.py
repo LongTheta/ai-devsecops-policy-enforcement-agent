@@ -1,26 +1,68 @@
 """CLI for running policy reviews."""
 
+import os
 from pathlib import Path
 
 import click
 
 from ai_devsecops_agent.integrations.github import post_pr_comment
 from ai_devsecops_agent.integrations.gitlab import post_mr_comment
-from ai_devsecops_agent.models import Platform, ReviewContext, ReviewRequest
+from ai_devsecops_agent.models import (
+    Platform,
+    ReviewContext,
+    ReviewEventContext,
+    ReviewRequest,
+)
 from ai_devsecops_agent.reporting import render_console, render_json, render_markdown, render_sarif
 from ai_devsecops_agent.review_comments import (
     render_finding_comment,
     render_grouped_comments,
     render_summary_comment,
 )
-from ai_devsecops_agent.remediation.engine import generate_remediation
+from ai_devsecops_agent.remediation.engine import generate_remediation, generate_remediation_bundle
+from ai_devsecops_agent.workflows.artifacts import (
+    workflow_integration_result,
+    write_artifacts,
+)
 from ai_devsecops_agent.workflows.review_workflow import run_review
 
 
 @click.group()
 def main() -> None:
-    """AI DevSecOps Policy Enforcement Agent – CI/CD, GitOps, and compliance-aware review."""
+    """Policy enforcement engine with AI-assisted remediation – CI/CD, GitOps, and compliance-aware review."""
     pass
+
+
+def _detect_event_context(platform: str, repo: str | None, branch: str | None, compliance: str) -> ReviewEventContext | None:
+    """Build ReviewEventContext from env (GitHub Actions, GitLab CI) when available."""
+    plat = platform
+    rep = repo or os.environ.get("GITHUB_REPOSITORY") or os.environ.get("CI_PROJECT_PATH")
+    br = branch or os.environ.get("GITHUB_REF_NAME") or os.environ.get("CI_COMMIT_REF_NAME")
+    sha = os.environ.get("GITHUB_SHA") or os.environ.get("CI_COMMIT_SHA")
+    pr_mr = None
+    if os.environ.get("GITHUB_EVENT_NAME") == "pull_request":
+        # GITHUB_REF = refs/pull/123/merge
+        try:
+            parts = (os.environ.get("GITHUB_REF") or "").split("/")
+            if len(parts) >= 3 and parts[1] == "pull":
+                pr_mr = int(parts[2])
+        except (ValueError, IndexError):
+            pass
+    if pr_mr is None and os.environ.get("CI_MERGE_REQUEST_IID"):
+        try:
+            pr_mr = int(os.environ["CI_MERGE_REQUEST_IID"])
+        except ValueError:
+            pass
+    actor = os.environ.get("GITHUB_ACTOR") or os.environ.get("GITLAB_USER_LOGIN")
+    return ReviewEventContext(
+        platform=plat,
+        repo=rep,
+        branch=br,
+        commit_sha=sha,
+        pr_or_mr_number=pr_mr,
+        actor=actor,
+        policy_mode=compliance,
+    )
 
 
 @main.command("review")
@@ -34,6 +76,9 @@ def main() -> None:
 @click.option("--repo", "repository_name", help="Repository name (for context)")
 @click.option("--branch", help="Branch name (for context)")
 @click.option("--compliance", "compliance_mode", default="default", help="Compliance mode (e.g. fedramp-moderate)")
+@click.option("--artifact-dir", type=click.Path(path_type=Path), help="Write CI/CD artifacts (review-result.json, policy-summary.json, etc.)")
+@click.option("--include-comments", is_flag=True, default=True, help="Include comments.json in artifact-dir (default: True)")
+@click.option("--include-remediations", is_flag=True, default=True, help="Include remediations.json in artifact-dir (default: True)")
 def review(
     platform: str,
     pipeline_path: Path | None,
@@ -45,6 +90,9 @@ def review(
     repository_name: str | None,
     branch: str | None,
     compliance_mode: str,
+    artifact_dir: Path | None,
+    include_comments: bool,
+    include_remediations: bool,
 ) -> None:
     """Run a full policy review on pipeline and/or GitOps manifests."""
     context = ReviewContext(
@@ -78,6 +126,26 @@ def review(
         click.echo(f"Report written to {output_path}")
     else:
         click.echo(report)
+
+    if artifact_dir:
+        report_md = render_markdown(result)
+        artifacts = write_artifacts(
+            result,
+            Path(artifact_dir),
+            include_comments=include_comments,
+            include_remediations=include_remediations,
+            platform=platform,
+            report_markdown=report_md,
+        )
+        event_ctx = _detect_event_context(platform, repository_name, branch, compliance_mode)
+        wf_result = workflow_integration_result(result, artifacts, event_ctx)
+        status_path = Path(artifact_dir) / "workflow-status.json"
+        import json
+        status_path.write_text(json.dumps(wf_result.model_dump(mode="json"), indent=2), encoding="utf-8")
+        click.echo(f"Artifacts written to {artifact_dir}/")
+        for a in artifacts:
+            click.echo(f"  - {a.name}")
+        click.echo(f"  - workflow-status.json")
 
     if result.verdict.value == "fail":
         raise SystemExit(1)
@@ -186,6 +254,7 @@ def comments(
 @click.option("--manifests", "manifest_paths", multiple=True, type=click.Path(path_type=Path), help="Path(s) to K8s manifests")
 @click.option("--policy", "policy_path", type=click.Path(path_type=Path), default="policies/default.yaml")
 @click.option("--include-patch", is_flag=True, help="Include patch-style diff suggestions")
+@click.option("--format", "output_format", type=click.Choice(["markdown", "bundle"]), default="markdown", help="Output format: markdown (default) or bundle (JSON)")
 @click.option("--out", "output_path", type=click.Path(path_type=Path), help="Write remediation suggestions to file")
 def remediate(
     pipeline_path: Path | None,
@@ -193,6 +262,7 @@ def remediate(
     manifest_paths: tuple[Path, ...],
     policy_path: Path,
     include_patch: bool,
+    output_format: str,
     output_path: Path | None,
 ) -> None:
     """Output actionable remediation suggestions for all findings."""
@@ -204,6 +274,17 @@ def remediate(
         policy_path=str(policy_path),
     )
     result = run_review(request)
+
+    if output_format == "bundle":
+        bundle = generate_remediation_bundle(result)
+        import json
+        output = json.dumps(bundle.model_dump(mode="json"), indent=2)
+        if output_path:
+            output_path.write_text(output, encoding="utf-8")
+            click.echo(f"Remediation bundle written to {output_path}")
+        else:
+            click.echo(output)
+        return
 
     lines = ["# Remediation Suggestions", ""]
     for f in result.findings:
@@ -241,6 +322,11 @@ def remediate(
                 lines.append("```diff")
                 lines.append(rem.patch.strip())
                 lines.append("```")
+                lines.append("")
+            if rem.limitations:
+                lines.append("**Limitations:**")
+                for lim in rem.limitations:
+                    lines.append(f"- {lim}")
                 lines.append("")
             if rem.notes:
                 lines.append(f"**Notes:** {rem.notes}")

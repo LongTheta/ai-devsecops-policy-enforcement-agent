@@ -6,14 +6,46 @@
 # Note that environment variables can be set in several places
 # See https://docs.gitlab.com/ci/variables/#cicd-variable-precedence
 stages:
-- test
-- secret-detection
+  - test
+  - secret-detection
+  - policy-review
+
 sast:
   stage: test
+
 include:
-- template: Security/SAST.gitlab-ci.yml
-- template: Security/Secret-Detection.gitlab-ci.yml
+  - template: Security/SAST.gitlab-ci.yml
+  - template: Security/Secret-Detection.gitlab-ci.yml
+
 variables:
   SECRET_DETECTION_ENABLED: 'true'
+
 secret_detection:
   stage: secret-detection
+
+# DevSecOps policy review - analyzes pipeline and GitOps manifests
+# Fails job on policy failure; artifacts available for MR review
+policy-review:
+  stage: policy-review
+  image: python:3.10-slim
+  before_script:
+    - pip install -e .
+  script:
+    - mkdir -p artifacts
+    - |
+      ai-devsecops-agent review \
+        --platform gitlab \
+        --pipeline .gitlab-ci.yml \
+        --gitops examples/insecure-argo-application.yaml \
+        --policy policies/default.yaml \
+        --output markdown \
+        --out artifacts/report.md \
+        --artifact-dir artifacts \
+        --include-comments \
+        --include-remediations
+  artifacts:
+    when: always
+    paths:
+      - artifacts/
+    expire_in: 7 days
+  allow_failure: false

@@ -6,6 +6,26 @@ from typing import Any
 import requests
 
 
+def format_comment_payload(body: str) -> dict[str, Any]:
+    """
+    Format a review note for GitLab MR Notes API.
+    POST /projects/:id/merge_requests/:mr_iid/notes
+    Body: {"body": "markdown content"}
+    """
+    return {"body": body}
+
+
+def format_review_payload(summary: str, event_context: dict[str, Any] | None = None) -> dict[str, Any]:
+    """
+    Format payload for GitLab MR note.
+    Ready for POST when GITLAB_TOKEN, project_id, mr_iid are available.
+    """
+    payload: dict[str, Any] = {"body": summary}
+    if event_context:
+        payload["_meta"] = {"event_context": event_context}
+    return payload
+
+
 def _get_base_url() -> str:
     """Get GitLab base URL from environment."""
     return os.environ.get("GITLAB_URL", "https://gitlab.com").rstrip("/")

@@ -1,7 +1,7 @@
 [project]
 name = "ai-devsecops-policy-enforcement-agent"
 version = "0.1.0"
-description = "AI-assisted DevSecOps policy enforcement framework for CI/CD, GitOps, and compliance-aware platform delivery"
+description = "Policy enforcement engine with AI-assisted remediation for CI/CD, GitOps, and compliance-aware platform delivery"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

@@ -154,6 +154,31 @@ def _analyze_workload(data: dict[str, Any], path_str: str, finding_group: str) -
     spec = data.get("spec", {}) or {}
     template = spec.get("template", {}) or {}
     pod_spec = template.get("spec", {}) or {}
+    containers = pod_spec.get("containers") or []
+
+    # imagePullPolicy: missing or IfNotPresent with mutable tag (:latest, no digest)
+    for c in containers:
+        if not isinstance(c, dict):
+            continue
+        image = (c.get("image") or "").strip()
+        pull_policy = (c.get("imagePullPolicy") or "").strip() or "IfNotPresent"
+        if not image:
+            continue
+        # Mutable tag: :latest, or no @sha256 (assume tag)
+        is_mutable = ":latest" in image.lower() or ("@" not in image and ":" in image)
+        if is_mutable and pull_policy.lower() in ("ifnotpresent", ""):
+            findings.append(Finding(
+                id="gitops-005",
+                title="Missing or weak imagePullPolicy for mutable tag",
+                severity=Severity.LOW,
+                category="gitops",
+                description=f"Container uses image {image!r} with imagePullPolicy {pull_policy!r}; consider Always for mutable tags or pin by digest.",
+                evidence=f"image: {image}, imagePullPolicy: {pull_policy}",
+                impacted_files=[path_str],
+                source_analyzer="gitops_analyzer",
+                finding_group=finding_group,
+            ))
+            break  # One finding per workload
 
     # Security context
     if not pod_spec.get("securityContext"):

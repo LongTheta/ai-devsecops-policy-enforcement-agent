@@ -71,19 +71,48 @@ class RemediationSuggestion(BaseModel):
 
     id: str = Field(description="Unique remediation suggestion ID")
     applies_to_finding_id: str = Field(description="Finding ID this applies to")
+    title: str | None = Field(default=None, description="Short title for the remediation")
     summary: str = Field(description="Short remediation summary")
     rationale: str = Field(description="Why this fix matters")
     steps: list[str] = Field(default_factory=list, description="Step-by-step guidance")
-    snippet: str | None = Field(default=None, description="Example snippet (labeled as example)")
+    snippet: str | None = Field(
+        default=None,
+        description="Example snippet (labeled as example; do not apply verbatim)",
+    )
     patch: str | None = Field(default=None, description="Optional unified diff suggestion")
     confidence: str = Field(
         default="medium",
         description="Confidence level: high, medium, low",
     )
-    notes: str | None = Field(default=None, description="Caveats or org-specific notes")
+    limitations: list[str] = Field(
+        default_factory=list,
+        description="Known limitations or caveats (e.g. org-specific, manual steps)",
+    )
+    notes: str | None = Field(default=None, description="Additional caveats or org-specific notes")
     is_organization_specific: bool = Field(
         default=False,
         description="True if fix requires org-specific config (vault, registry, etc.)",
+    )
+
+
+class RemediationBundle(BaseModel):
+    """Bundled remediation output for a full review result."""
+
+    id: str = Field(default="remediation-bundle", description="Bundle identifier")
+    finding_count: int = Field(description="Number of findings addressed")
+    remediation_count: int = Field(description="Number of remediations with guidance")
+    patch_count: int = Field(description="Number of findings with patch-style suggestions")
+    remediations: list[RemediationSuggestion] = Field(
+        default_factory=list,
+        description="Remediation suggestions per finding",
+    )
+    patches: list[SuggestedPatch] = Field(
+        default_factory=list,
+        description="Patch-style suggestions where applicable",
+    )
+    limitations: list[str] = Field(
+        default_factory=list,
+        description="Overall limitations (e.g. no auto-edit; examples only)",
     )
 
 
@@ -169,3 +198,38 @@ class ReviewResult(BaseModel):
     next_steps: list[str] = Field(default_factory=list)
     context: ReviewContext = Field(default_factory=ReviewContext)
     metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ReviewEventContext(BaseModel):
+    """Workflow-trigger context for PR/MR or CI runs."""
+
+    platform: str = Field(description="github | gitlab | local")
+    repo: str | None = Field(default=None, description="Repository identifier (owner/repo or project path)")
+    branch: str | None = Field(default=None)
+    commit_sha: str | None = Field(default=None)
+    pr_or_mr_number: int | None = Field(default=None, description="PR number (GitHub) or MR IID (GitLab)")
+    actor: str | None = Field(default=None, description="User or bot triggering the run")
+    environment: str | None = Field(default=None)
+    policy_mode: str = Field(default="default", description="e.g. default, fedramp-moderate")
+
+
+class ReviewArtifact(BaseModel):
+    """Single artifact produced by a review run."""
+
+    name: str = Field(description="Artifact filename (e.g. review-result.json)")
+    content_type: str = Field(default="application/json", description="MIME type")
+    path: str | None = Field(default=None, description="Relative path when written to artifact-dir")
+
+
+class WorkflowIntegrationResult(BaseModel):
+    """Result of a workflow-integrated review run."""
+
+    status: str = Field(description="pass | pass_with_warnings | fail")
+    verdict: str = Field(description="Same as status for compatibility")
+    summary: str = Field(default="")
+    finding_count: int = Field(default=0)
+    critical_count: int = Field(default=0)
+    high_count: int = Field(default=0)
+    artifacts: list[ReviewArtifact] = Field(default_factory=list)
+    event_context: ReviewEventContext | None = Field(default=None)
+    exit_code: int = Field(default=0, description="0=pass, 1=fail")

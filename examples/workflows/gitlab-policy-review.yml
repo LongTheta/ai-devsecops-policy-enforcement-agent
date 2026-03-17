@@ -1,0 +1,29 @@
+# Example: GitLab CI policy review job
+# Add this job to your .gitlab-ci.yml or include as a template
+#
+# Produces: review-result.json, gitlab-comments.json, report.md, remediations.json
+# Fails pipeline on policy failure (critical/high findings)
+
+policy-review:
+  stage: test
+  image: python:3.10-slim
+  before_script:
+    - pip install -e .
+  script:
+    - mkdir -p artifacts
+    - |
+      ai-devsecops-agent review \
+        --platform gitlab \
+        --pipeline .gitlab-ci.yml \
+        --gitops k8s/argo-application.yaml \
+        --policy policies/default.yaml \
+        --output markdown \
+        --out artifacts/report.md \
+        --artifact-dir artifacts \
+        --include-comments \
+        --include-remediations
+  artifacts:
+    when: always
+    paths:
+      - artifacts/
+    expire_in: 7 days

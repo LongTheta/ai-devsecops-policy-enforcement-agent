@@ -8,6 +8,26 @@ import requests
 GITHUB_API = "https://api.github.com"
 
 
+def format_comment_payload(body: str) -> dict[str, Any]:
+    """
+    Format a review comment for GitHub Issues/PR API.
+    POST /repos/{owner}/{repo}/issues/{issue_number}/comments
+    Body: {"body": "markdown content"}
+    """
+    return {"body": body}
+
+
+def format_review_payload(summary: str, event_context: dict[str, Any] | None = None) -> dict[str, Any]:
+    """
+    Format payload for GitHub PR review comment.
+    Ready for POST when GITHUB_TOKEN, owner, repo, pr_number are available.
+    """
+    payload: dict[str, Any] = {"body": summary}
+    if event_context:
+        payload["_meta"] = {"event_context": event_context}
+    return payload
+
+
 def _get_token() -> str | None:
     """Get GitHub token from environment."""
     return os.environ.get("GITHUB_TOKEN")

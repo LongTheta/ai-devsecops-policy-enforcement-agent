@@ -1,0 +1,51 @@
+# Example: GitHub Actions policy review workflow
+# Copy to .github/workflows/policy-review.yml or include in your workflow
+#
+# This runs the agent on push/PR, saves artifacts, and fails the job on policy failure.
+
+name: Policy Review
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  policy-review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install agent
+        run: pip install -e .
+
+      - name: Run policy review
+        id: review
+        run: |
+          mkdir -p artifacts
+          ai-devsecops-agent review \
+            --platform github \
+            --pipeline .github/workflows/ci.yml \
+            --gitops k8s/argo-application.yaml \
+            --policy policies/default.yaml \
+            --output markdown \
+            --out artifacts/report.md \
+            --artifact-dir artifacts
+        continue-on-error: true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: policy-review-artifacts
+          path: artifacts/
+
+      - name: Fail on policy failure
+        if: steps.review.outcome == 'failure'
+        run: exit 1
