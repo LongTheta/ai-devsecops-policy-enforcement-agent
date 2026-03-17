@@ -1,0 +1,15 @@
+# Example K8s Deployment with issues for auto-fix demo
+# - Missing resource limits (gitops-003)
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+spec:
+  replicas: 2
+  template:
+    spec:
+      containers:
+        - name: app
+          image: myapp:latest
+          ports:
+            - containerPort: 8080

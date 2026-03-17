@@ -70,6 +70,13 @@ Maps findings to control families such as:
 + image: node@sha256:...
 ```
 
+### Policy-Aware Auto-Fix
+
+- **Deterministic, reviewable patches** for common CI/CD, GitOps, and K8s issues
+- **Modes:** `suggest` (no changes) | `patch` (write to output dir) | `apply` (modify originals with backups)
+- **Safety model:** `safe` | `review_required` | `suggest_only` per fix
+- **First-wave fixers:** unpinned image/action, missing resource limits, risky Argo sync, missing SBOM step
+
 ### PR / MR Review Comments
 
 Generates developer-friendly review comments for GitHub PRs and GitLab MRs:
@@ -101,6 +108,7 @@ Analyzers → Policy Engine → Compliance Mapping → Remediation → Reporting
 | **SBOM analyzer** | Supply chain visibility |
 | **Cross-system analyzer** | CI↔GitOps governance gaps |
 | **Policy engine** | YAML-based enforcement |
+| **Auto-fix engine** | Deterministic, policy-aware config patches |
 | **Reporting** | Markdown, JSON, SARIF, console, PR/MR comments |
 
 ---
@@ -122,6 +130,16 @@ ai-devsecops-agent review \
   --gitops k8s/argo-application.yaml \
   --policy policies/default.yaml \
   --artifact-dir artifacts/
+```
+
+**Review with remote fetch (PR/MR):**
+
+```bash
+# GitHub: fetch pipeline from PR and review
+ai-devsecops-agent review-all --owner myorg --repo myrepo --pr 42 --artifact-dir artifacts
+
+# GitLab: fetch pipeline from MR and review
+ai-devsecops-agent review-all --project mygroup/myrepo --mr 10 --artifact-dir artifacts
 ```
 
 **Run a review (GitLab):**
@@ -156,6 +174,31 @@ ai-devsecops-agent remediate \
   --gitops examples/insecure-argo-application.yaml \
   --include-patch \
   --out remediations.md
+```
+
+**Auto-fix (suggest → patch → apply):**
+
+```bash
+# Suggest fixes (no file changes)
+ai-devsecops-agent auto-fix \
+  --pipeline examples/insecure-github-actions.yml \
+  --gitops examples/insecure-argo-application.yaml \
+  --manifests examples/insecure-k8s-deployment.yaml \
+  --mode suggest
+
+# Write patched copies to output directory
+ai-devsecops-agent auto-fix \
+  --input artifacts/review-result.json \
+  --mode patch \
+  --output-dir artifacts/fixes
+
+# Apply safe fixes to originals (creates backups)
+ai-devsecops-agent auto-fix \
+  --pipeline examples/autofix/insecure-pipeline-for-autofix.yml \
+  --gitops examples/autofix/insecure-argo-for-autofix.yaml \
+  --manifests examples/autofix/insecure-for-autofix.yaml \
+  --mode apply \
+  --only-safe
 ```
 
 ---
@@ -206,6 +249,7 @@ See [docs/WORKFLOW-INTEGRATION.md](docs/WORKFLOW-INTEGRATION.md) for details.
 - ⚙️ Validate GitOps deployment safety
 - 🧾 Generate compliance-aware reports
 - 🛠 Suggest fixes for insecure configurations
+- 🔧 Auto-fix common issues (suggest, patch, or apply)
 - 💬 Post review comments to PRs/MRs (GitHub, GitLab)
 
 ---
@@ -229,11 +273,12 @@ See [docs/WORKFLOW-INTEGRATION.md](docs/WORKFLOW-INTEGRATION.md) for details.
 
 ## Roadmap
 
-### Near-term
+### Near-term ✅
 
 - [x] PR/MR API integration (post comments)
 - [x] SARIF output for GitHub Advanced Security, GitLab SAST
-- [ ] Unified `review-all` with remote fetch
+- [x] Policy-aware auto-fix (suggest, patch, apply)
+- [x] Unified `review-all` with remote fetch
 
 ### Mid-term
 
@@ -243,9 +288,12 @@ See [docs/WORKFLOW-INTEGRATION.md](docs/WORKFLOW-INTEGRATION.md) for details.
 
 ### Advanced
 
-- [ ] Auto-fix commit bot
+- [ ] Auto-fix commit bot (Git-based apply)
+- [ ] Digest/SHA resolution (Docker + GitHub API) for pin fixers
 - [ ] Compliance evidence generator
 - [ ] Drift detection across CI → GitOps → runtime
+
+See [docs/ROADMAP.md](docs/ROADMAP.md) for full details.
 
 ---
 
@@ -254,8 +302,10 @@ See [docs/WORKFLOW-INTEGRATION.md](docs/WORKFLOW-INTEGRATION.md) for details.
 | Command | Purpose |
 |---------|---------|
 | `review` | Run full policy review; output Markdown, JSON, SARIF, or console |
+| `review-all` | Review with optional remote fetch of pipeline from PR/MR |
 | `comments` | Generate PR/MR review comments; optional `--post` to publish |
 | `remediate` | Output remediation suggestions with optional patch-style diffs |
+| `auto-fix` | Generate or apply safe config patches (suggest \| patch \| apply) |
 
 See `ai-devsecops-agent --help` and [docs/COMPONENTS.md](docs/COMPONENTS.md) for details.
 

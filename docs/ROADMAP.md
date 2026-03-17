@@ -1,45 +1,83 @@
 # Roadmap
 
-## Current (MVP)
-
-- [x] Core models and policy loader
-- [x] Pipeline analyzer (secrets, unpinned, SBOM, approval, script; GitLab and GitHub Actions specific)
-- [x] GitOps analyzer (Argo CD sync, project, resources, securityContext)
-- [x] Cross-system analyzer (CI↔GitOps governance gaps)
-- [x] Compliance mapper (broad control families)
-- [x] SBOM analyzer (presence of SBOM/provenance/signing)
-- [x] Markdown, JSON, console reporting (findings grouped by GitHub Actions, GitLab, GitOps, cross-system)
-- [x] CLI `review` command
-- [x] CLI `comments` command (PR/MR comment generation)
-- [x] CLI `remediate` command (auto-remediation with patch-style diffs)
-- [x] Auto-remediation engine (RemediationSuggestion, SuggestedPatch)
-- [x] Example pipelines and manifests (GitLab + Argo, GitHub + Argo)
-- [x] Unit tests and GitHub Actions
-- [x] SARIF output (`--output sarif`) for GitHub Advanced Security, GitLab SAST
-- [x] Policy engine – Full evaluation of all policy rules (pinned deps, manual gate, artifact traceability, audit evidence, signed artifacts)
-- [x] GitLab integration – Fetch file content and MR context from GitLab API
-- [x] GitHub integration – Fetch file content and PR context from GitHub API
-
-## Repository
-
-- **GitHub:** [github.com/LongTheta/ai-devsecops-policy-enforcement-agent](https://github.com/LongTheta/ai-devsecops-policy-enforcement-agent)
-- **GitLab:** [gitlab.com/cathcampbell/ai-devsecops-policy-enforcement-agent](https://gitlab.com/cathcampbell/ai-devsecops-policy-enforcement-agent)
-
-## Next
-
-- [x] **MR/PR comment posting** – `comments --post` with `--owner/--repo/--pr` (GitHub) or `--project/--mr` (GitLab)
-- [ ] **Argo CD integration** – Read Application status and sync state for context
-- [ ] **LLM-assisted review** – Optional pass: send pipeline/manifest + prompts to an LLM for additional findings and remediations
-- [ ] **MCP server** – Expose agent as Model Context Protocol server for IDE/chat integrations
+This document tracks implemented features, near-term goals, and future work for the AI DevSecOps Policy Enforcement Agent.
 
 ---
 
-## Related docs
+## Implemented
 
-- [COMPONENTS.md](COMPONENTS.md) – Detailed component reference
+| Capability | Status | Notes |
+|------------|--------|-------|
+| Pipeline analysis | ✅ | GitLab CI, GitHub Actions |
+| GitOps / Argo CD analysis | ✅ | Sync policy, resource limits, security context |
+| SBOM analyzer | ✅ | Supply chain visibility |
+| Cross-system analyzer | ✅ | CI↔GitOps governance gaps |
+| Policy engine | ✅ | YAML-based rules |
+| Compliance mapping | ✅ | Control families (AC, AU, CM, etc.) |
+| Remediation suggestions | ✅ | Step-by-step, snippets, patches |
+| Policy-aware auto-fix | ✅ | suggest \| patch \| apply modes |
+| PR/MR comment posting | ✅ | GitHub, GitLab |
+| Artifact generation | ✅ | review-result.json, comments.json, etc. |
+| SARIF output | ✅ | GitHub Advanced Security, GitLab SAST |
+| Remote fetch | ✅ | `fetch_pipeline_from_pr()`, `fetch_pipeline_from_mr()` |
+| **review-all** | ✅ | Unified review with remote fetch from PR/MR |
 
-## Later
+---
 
-- [ ] **Policy engine actions** – Configurable actions (block, warn, info) per rule
-- [ ] **Custom rules** – User-defined rules (e.g. regex or script) in policy YAML
-- [ ] **Dashboard** – Simple UI for running reviews and viewing history (optional)
+## Near-Term
+
+| Item | Status | Notes |
+|------|--------|-------|
+| ~~Unified review-all with remote fetch~~ | ✅ Done | `review-all --owner/--repo/--pr` or `--project/--mr` |
+
+---
+
+## Mid-Term
+
+| Item | Status | Notes |
+|------|--------|-------|
+| SBOM MCP tool | 🔲 | MCP server for SBOM queries |
+| Evaluation history + trend tracking | 🔲 | Store verdicts over time |
+| Observability (OTel / Logfire) | 🔲 | Traces, metrics |
+
+---
+
+## Auto-Fix Future Work
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Digest resolution via Docker API | 🔲 | Optional; enables auto-apply for `pin_container_image` |
+| GitHub Action SHA lookup via API | 🔲 | Optional; enables auto-apply for `pin_github_action` |
+| Line-level diff comments | 🔲 | Post comments on specific lines in PR/MR |
+| Auto-fix commit bot | 🔲 | Git-based apply (create branch, open PR) |
+| Deduplicate fix candidates | 🔲 | Same fix for multiple findings (e.g. pin_github_action) |
+
+---
+
+## Advanced
+
+| Item | Status | Notes |
+|------|--------|-------|
+| Auto-fix commit bot (Git-based apply) | 🔲 | Create branch, apply fixes, open PR |
+| Compliance evidence generator | 🔲 | Structured evidence for audits |
+| Drift detection | 🔲 | CI → GitOps → runtime consistency |
+
+---
+
+## Stubbed
+
+| Capability | Status | Notes |
+|------------|--------|-------|
+| Line-level diff comments | 🔲 | Future: post comments on specific lines |
+| PR/MR check status API | 🔲 | Future: set check status (e.g. "Policy: Fail") |
+| Auto-fetch pipeline from PR | ✅ Wired | Use `review-all --owner/--repo/--pr` |
+
+---
+
+## How to Contribute
+
+1. **Near-term** – Review-all is done; mid-term items are open.
+2. **Auto-fix** – Digest/SHA resolution would require Docker/GitHub API clients.
+3. **MCP** – SBOM tool would expose a Model Context Protocol server.
+
+See [WORKFLOW-INTEGRATION.md](WORKFLOW-INTEGRATION.md) for integration details and [AUTOFIX.md](AUTOFIX.md) for auto-fix architecture.

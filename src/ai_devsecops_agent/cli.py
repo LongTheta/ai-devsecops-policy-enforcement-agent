@@ -25,6 +25,10 @@ from ai_devsecops_agent.workflows.artifacts import (
     write_artifacts,
 )
 from ai_devsecops_agent.workflows.review_workflow import run_review
+from ai_devsecops_agent.autofix import run_autofix
+from ai_devsecops_agent.autofix.models import AutoFixRequest
+from ai_devsecops_agent.integrations.github import fetch_pipeline_from_pr
+from ai_devsecops_agent.integrations.gitlab import fetch_pipeline_from_mr
 
 
 @click.group()
@@ -149,6 +153,123 @@ def review(
 
     if result.verdict.value == "fail":
         raise SystemExit(1)
+
+
+@main.command("review-all")
+@click.option("--platform", "-p", type=click.Choice(["gitlab", "github", "local"]), default="local")
+@click.option("--owner", help="GitHub repo owner (for remote fetch)")
+@click.option("--repo", "github_repo", help="GitHub repo name (for remote fetch)")
+@click.option("--pr", "pr_number", type=int, help="GitHub PR number (for remote fetch)")
+@click.option("--project", "gitlab_project", help="GitLab project ID or path (for remote fetch)")
+@click.option("--mr", "mr_iid", type=int, help="GitLab MR IID (for remote fetch)")
+@click.option("--pipeline-path", default=None, help="Path to fetch (default: .github/workflows/ci.yml or .gitlab-ci.yml)")
+@click.option("--pipeline", "pipeline_path_local", type=click.Path(path_type=Path), help="Local pipeline file (alternative to remote fetch)")
+@click.option("--gitops", "gitops_paths", multiple=True, type=click.Path(path_type=Path), help="Path(s) to GitOps manifests")
+@click.option("--manifests", "manifest_paths", multiple=True, type=click.Path(path_type=Path), help="Path(s) to K8s manifests")
+@click.option("--policy", "policy_path", type=click.Path(path_type=Path), default="policies/default.yaml")
+@click.option("--output", "-o", "output_format", type=click.Choice(["markdown", "json", "console", "sarif"]), default="markdown")
+@click.option("--out", "output_path", type=click.Path(path_type=Path), help="Write report to file")
+@click.option("--artifact-dir", type=click.Path(path_type=Path), help="Write CI/CD artifacts")
+def review_all(
+    platform: str,
+    owner: str | None,
+    github_repo: str | None,
+    pr_number: int | None,
+    gitlab_project: str | None,
+    mr_iid: int | None,
+    pipeline_path: str | None,
+    pipeline_path_local: Path | None,
+    gitops_paths: tuple[Path, ...],
+    manifest_paths: tuple[Path, ...],
+    policy_path: Path,
+    output_format: str,
+    output_path: Path | None,
+    artifact_dir: Path | None,
+) -> None:
+    """Run full review with optional remote fetch of pipeline from PR/MR."""
+    import tempfile
+
+    pipeline_to_use: str | None = None
+    temp_file: Path | None = None
+
+    if owner and github_repo and pr_number is not None:
+        path = pipeline_path or ".github/workflows/ci.yml"
+        content = fetch_pipeline_from_pr(owner, github_repo, pr_number, path)
+        if content:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as f:
+                f.write(content)
+                temp_file = Path(f.name)
+            pipeline_to_use = str(temp_file)
+            click.echo(f"Fetched pipeline from PR #{pr_number} ({path})", err=True)
+        else:
+            click.echo("Failed to fetch pipeline from PR. Check GITHUB_TOKEN and repo access.", err=True)
+            raise SystemExit(1)
+    elif gitlab_project and mr_iid is not None:
+        path = pipeline_path or ".gitlab-ci.yml"
+        content = fetch_pipeline_from_mr(gitlab_project, mr_iid, path)
+        if content:
+            with tempfile.NamedTemporaryFile(mode="w", suffix=".yml", delete=False) as f:
+                f.write(content)
+                temp_file = Path(f.name)
+            pipeline_to_use = str(temp_file)
+            click.echo(f"Fetched pipeline from MR !{mr_iid} ({path})", err=True)
+        else:
+            click.echo("Failed to fetch pipeline from MR. Check GITLAB_TOKEN and project access.", err=True)
+            raise SystemExit(1)
+    elif pipeline_path_local:
+        pipeline_to_use = str(pipeline_path_local)
+
+    if not pipeline_to_use and not gitops_paths and not manifest_paths:
+        click.echo("Provide --owner/--repo/--pr (GitHub), --project/--mr (GitLab), or --pipeline/--gitops/--manifests.", err=True)
+        raise SystemExit(1)
+
+    try:
+        context = ReviewContext(platform=Platform(platform))
+        request = ReviewRequest(
+            context=context,
+            pipeline_path=pipeline_to_use,
+            gitops_paths=[str(p) for p in gitops_paths],
+            manifest_paths=[str(p) for p in manifest_paths],
+            policy_path=str(policy_path),
+        )
+        result = run_review(request)
+
+        if output_format == "markdown":
+            report = render_markdown(result)
+        elif output_format == "json":
+            report = render_json(result)
+        elif output_format == "sarif":
+            report = render_sarif(result)
+        else:
+            report = render_console(result)
+
+        if output_path:
+            output_path.write_text(report, encoding="utf-8")
+            click.echo(f"Report written to {output_path}")
+        else:
+            click.echo(report)
+
+        if artifact_dir:
+            report_md = render_markdown(result)
+            artifacts = write_artifacts(
+                result,
+                Path(artifact_dir),
+                platform=platform,
+                report_markdown=report_md,
+            )
+            event_ctx = _detect_event_context(platform, None, None, "default")
+            wf_result = workflow_integration_result(result, artifacts, event_ctx)
+            import json
+            (Path(artifact_dir) / "workflow-status.json").write_text(
+                json.dumps(wf_result.model_dump(mode="json"), indent=2), encoding="utf-8"
+            )
+            click.echo(f"Artifacts written to {artifact_dir}/")
+
+        if result.verdict.value == "fail":
+            raise SystemExit(1)
+    finally:
+        if temp_file and temp_file.exists():
+            temp_file.unlink(missing_ok=True)
 
 
 @main.command("comments")
@@ -346,3 +467,155 @@ def remediate(
         click.echo(f"Remediation suggestions written to {output_path}")
     else:
         click.echo(output)
+
+
+@main.command("auto-fix")
+@click.option("--platform", "-p", type=click.Choice(["gitlab", "github", "local"]), default="local")
+@click.option("--input", "input_path", type=click.Path(path_type=Path), help="Path to review-result.json (alternative to --pipeline/--gitops)")
+@click.option("--pipeline", "pipeline_path", type=click.Path(path_type=Path), help="Path to pipeline file")
+@click.option("--gitops", "gitops_paths", multiple=True, type=click.Path(path_type=Path), help="Path(s) to GitOps manifests")
+@click.option("--manifests", "manifest_paths", multiple=True, type=click.Path(path_type=Path), help="Path(s) to K8s manifests")
+@click.option("--policy", "policy_path", type=click.Path(path_type=Path), default="policies/default.yaml")
+@click.option("--mode", "-m", type=click.Choice(["suggest", "patch", "apply"]), default="suggest", help="suggest (no changes) | patch (write to output-dir) | apply (modify originals)")
+@click.option("--only-safe", is_flag=True, help="Only include fixes with can_auto_apply=True")
+@click.option("--output-dir", "-o", type=click.Path(path_type=Path), help="Output directory for patch mode")
+@click.option("--backup/--no-backup", default=True, help="Create backups before apply (default: True)")
+@click.option("--dry-run", is_flag=True, help="Show what would be done without writing")
+@click.option("--rules", multiple=True, help="Restrict to specific fix types (e.g. add_sbom_step)")
+@click.option("--out", "output_path", type=click.Path(path_type=Path), help="Write auto-fix report to file")
+@click.option("--format", "output_format", type=click.Choice(["markdown", "json"]), default="markdown", help="Output format")
+def auto_fix(
+    platform: str,
+    input_path: Path | None,
+    pipeline_path: Path | None,
+    gitops_paths: tuple[Path, ...],
+    manifest_paths: tuple[Path, ...],
+    policy_path: Path,
+    mode: str,
+    only_safe: bool,
+    output_dir: Path | None,
+    backup: bool,
+    dry_run: bool,
+    rules: tuple[str, ...],
+    output_path: Path | None,
+    output_format: str,
+) -> None:
+    """Generate or apply safe, policy-aware config patches for findings."""
+    if input_path and (pipeline_path or gitops_paths or manifest_paths):
+        click.echo("Use either --input or --pipeline/--gitops/--manifests, not both.", err=True)
+        raise SystemExit(1)
+    if not input_path and not pipeline_path and not gitops_paths and not manifest_paths:
+        click.echo("Provide --input or --pipeline/--gitops/--manifests.", err=True)
+        raise SystemExit(1)
+    if mode == "patch" and not output_dir:
+        click.echo("--output-dir required for patch mode.", err=True)
+        raise SystemExit(1)
+
+    request = AutoFixRequest(
+        mode=mode,
+        input_path=str(input_path) if input_path else None,
+        pipeline_path=str(pipeline_path) if pipeline_path else None,
+        gitops_paths=[str(p) for p in gitops_paths],
+        manifest_paths=[str(p) for p in manifest_paths],
+        output_dir=str(output_dir) if output_dir else None,
+        only_safe=only_safe,
+        backup=backup,
+        dry_run=dry_run,
+        rules=list(rules) if rules else None,
+    )
+
+    findings: list | None = None
+    file_contents: dict | None = None
+
+    if not input_path:
+        # Run review to get findings
+        rev_request = ReviewRequest(
+            context=ReviewContext(platform=Platform(platform)),
+            pipeline_path=str(pipeline_path) if pipeline_path else None,
+            gitops_paths=[str(p) for p in gitops_paths],
+            manifest_paths=[str(p) for p in manifest_paths],
+            policy_path=str(policy_path),
+        )
+        result = run_review(rev_request)
+        findings = result.findings
+        path_set = set()
+        for f in findings:
+            path_set.update(f.impacted_files)
+        # Include explicit paths from request
+        if pipeline_path:
+            path_set.add(str(pipeline_path))
+        path_set.update(str(p) for p in gitops_paths)
+        path_set.update(str(p) for p in manifest_paths)
+        file_contents = {}
+        from ai_devsecops_agent.autofix.patcher import load_yaml
+        for p in path_set:
+            path = Path(p)
+            if path.exists():
+                content = path.read_text(encoding="utf-8")
+                data, _ = load_yaml(path)
+                file_contents[p] = (content, data)
+
+    autofix_result = run_autofix(request, findings=findings, file_contents=file_contents)
+
+    report = _render_autofix_report(autofix_result, output_format)
+    if output_path:
+        output_path.write_text(report, encoding="utf-8")
+        click.echo(f"Auto-fix report written to {output_path}")
+    else:
+        click.echo(report)
+
+    if autofix_result.errors:
+        for err in autofix_result.errors:
+            click.echo(f"Error: {err}", err=True)
+        raise SystemExit(1)
+
+
+def _render_autofix_report(result, fmt: str) -> str:
+    """Render auto-fix result as markdown or JSON."""
+    import json
+
+    if fmt == "json":
+        return json.dumps(result.model_dump(mode="json"), indent=2)
+
+    lines = [
+        "# Auto-Fix Report",
+        "",
+        f"**Mode:** {result.mode}",
+        f"**Findings:** {result.finding_count}",
+        f"**Candidates:** {result.candidate_count}",
+        f"**Applied:** {result.applied_count}",
+        "",
+        result.summary,
+        "",
+    ]
+    if result.backup_created:
+        lines.append("## Backups Created")
+        for bp in result.backup_created:
+            lines.append(f"- {bp}")
+        lines.append("")
+
+    lines.append("## Fix Candidates")
+    for c in result.candidates:
+        lines.append(f"### {c.title} (`{c.fix_type}`)")
+        lines.append("")
+        lines.append(f"- **Finding:** {c.finding_id} | **File:** {c.file_path}")
+        lines.append(f"- **Safety:** {c.safety_level.value} | **Confidence:** {c.confidence.value}")
+        lines.append(f"- **Can auto-apply:** {c.can_auto_apply}")
+        lines.append("")
+        lines.append(c.description)
+        lines.append("")
+        if c.diff:
+            lines.append("**Diff:**")
+            lines.append("```diff")
+            lines.append(c.diff[:2000] + ("..." if len(c.diff) > 2000 else ""))
+            lines.append("```")
+            lines.append("")
+        if c.limitations:
+            lines.append("**Limitations:**")
+            for lim in c.limitations:
+                lines.append(f"- {lim}")
+            lines.append("")
+        lines.append("---")
+        lines.append("")
+
+    return "\n".join(lines)

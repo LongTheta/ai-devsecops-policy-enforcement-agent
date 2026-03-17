@@ -15,7 +15,9 @@ This folder contains documentation for the AI DevSecOps Policy Enforcement Agent
 | [INTEGRATIONS.md](INTEGRATIONS.md) | Current (file-based) and future (GitLab, GitHub, Argo CD API) integrations |
 | [WORKFLOW-INTEGRATION.md](WORKFLOW-INTEGRATION.md) | **CI/CD integration** – artifacts, GitHub Actions, GitLab CI, posting comments |
 | [GITLAB-WORKFLOW.md](GITLAB-WORKFLOW.md) | **GitLab-specific** – CI job, artifacts, MR comments, pass/fail |
-| [ROADMAP.md](ROADMAP.md) | Current features, next steps, and later plans |
+| [GITHUB-WORKFLOW.md](GITHUB-WORKFLOW.md) | **GitHub-specific** – Actions workflow, artifacts, PR comments |
+| [AUTOFIX.md](AUTOFIX.md) | Policy-aware auto-fix – suggest, patch, apply modes |
+| [ROADMAP.md](ROADMAP.md) | **Roadmap** – implemented, near-term, mid-term, future work |
 
 ## Quick links
 

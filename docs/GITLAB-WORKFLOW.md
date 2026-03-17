@@ -112,4 +112,4 @@ See [.gitlab-ci.yml](../.gitlab-ci.yml) for the `policy-review` job used in this
 | Post MR comment from CI | ✅ Implemented (`comments --post`) |
 | Line-level diff comments | 🔲 Stubbed |
 | MR check status API | 🔲 Stubbed |
-| Auto-fetch pipeline from MR | 🔲 Manual path; use `fetch_pipeline_from_mr()` in custom scripts |
+| Auto-fetch pipeline from MR | ✅ Use `review-all --project/--mr` |

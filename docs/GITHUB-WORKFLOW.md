@@ -140,4 +140,4 @@ See [.github/workflows/policy-review.yml](../.github/workflows/policy-review.yml
 | Post PR comment from CI | ✅ Implemented (`comments --post`) |
 | Line-level review comments | 🔲 Stubbed |
 | PR check status API | 🔲 Stubbed |
-| Auto-fetch pipeline from PR | 🔲 Manual path; use `fetch_pipeline_from_pr()` in custom scripts |
+| Auto-fetch pipeline from PR | ✅ Use `review-all --owner/--repo/--pr` |

@@ -35,7 +35,7 @@ The agent is designed to participate in actual review and delivery flows:
 |------------|--------|-------|
 | Line-level diff comments | 🔲 | Future: post comments on specific lines |
 | PR/MR check status API | 🔲 | Future: set check status (e.g. "Policy: Fail") |
-| Auto-fetch pipeline from PR | 🔲 | Manual path today; can be wired in workflow |
+| Auto-fetch pipeline from PR | ✅ | Use `review-all --owner/--repo/--pr` |
 
 ---
 
@@ -92,6 +92,16 @@ ai-devsecops-agent review \
 | `--artifact-dir` | Write CI/CD artifacts to this directory |
 | `--include-comments` | Include `comments.json` (default: true) |
 | `--include-remediations` | Include `remediations.json` (default: true) |
+
+---
+
+## Auto-Fix
+
+The agent can generate or apply safe config patches. See [AUTOFIX.md](AUTOFIX.md) for details.
+
+```bash
+ai-devsecops-agent auto-fix --input artifacts/review-result.json --mode patch --output-dir artifacts/fixes
+```
 
 ---
 
