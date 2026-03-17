@@ -32,7 +32,7 @@ jobs:
             --platform github \
             --pipeline .github/workflows/test.yml \
             --gitops examples/insecure-argo-application.yaml \
-            --policy policies/default.yaml \
+            --policy policies/self-review.yaml \
             --output markdown \
             --out artifacts/report.md \
             --artifact-dir artifacts \

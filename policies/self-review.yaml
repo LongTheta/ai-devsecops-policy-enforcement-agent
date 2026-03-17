@@ -1,0 +1,10 @@
+name: self-review
+description: Minimal policy for repository self-review (CI only). Critical rules only.
+
+rules:
+  - id: no_plaintext_secrets
+    name: No plaintext secrets
+    description: Pipeline must not contain hardcoded credentials, API keys, or tokens.
+    severity: critical
+    category: secrets
+    enabled: true
