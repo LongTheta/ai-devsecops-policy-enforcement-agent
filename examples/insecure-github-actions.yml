@@ -1,0 +1,19 @@
+# Example GitHub Actions with intentional issues for testing
+
+name: CI
+on: [push]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: docker build -t myapp:latest .
+      # Unpinned action; no SBOM
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - run: echo "Deploying..."
+      # No environment protection or approval

@@ -1,0 +1,25 @@
+{
+  "verdict": "fail",
+  "summary": "Review failed: 1 critical, 2 high finding(s). Address these before merge or deployment.",
+  "findings": [
+    {
+      "id": "pipeline-001",
+      "title": "Possible plaintext secret or credential",
+      "severity": "critical",
+      "category": "secrets",
+      "description": "Pipeline content appears to contain hardcoded credentials, API keys, or tokens.",
+      "remediation_summary": "Use secret variables, vault, or managed secrets; never commit secrets."
+    },
+    {
+      "id": "pipeline-002",
+      "title": "Unpinned container image or action",
+      "severity": "high",
+      "category": "supply_chain",
+      "description": "Pipeline uses an image or action without a digest or explicit tag."
+    }
+  ],
+  "policy_results": [],
+  "compliance_considerations": ["Findings map to control families: AC, AU, CM, IA, SA, SC, SI."],
+  "recommended_remediations": ["Use CI/CD secret variables", "Pin by digest or SHA"],
+  "next_steps": ["Address critical and high findings before merge or deployment."]
+}

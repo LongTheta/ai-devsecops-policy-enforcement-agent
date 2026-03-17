@@ -1,0 +1,29 @@
+# Insecure GitHub Actions + Argo CD flow – for testing cross-system review
+# Issues: unpinned actions, no SBOM, no environment protection, direct deploy
+
+name: CI/CD
+on:
+  push:
+    branches: [main]
+  pull_request_target:
+    branches: [main]
+
+permissions: write-all
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: docker build -t myapp:latest .
+      # No SBOM, no provenance, no artifact retention
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - run: echo "Deploying to Argo..."
+      - run: kubectl apply -f k8s/
+      # No environment: production
+      # No approval gate

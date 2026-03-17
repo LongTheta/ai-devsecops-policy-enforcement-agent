@@ -1,0 +1,45 @@
+name: default
+description: Default DevSecOps policy set for CI/CD and GitOps
+
+rules:
+  - id: no_plaintext_secrets
+    name: No plaintext secrets
+    description: Pipeline must not contain hardcoded credentials, API keys, or tokens.
+    severity: critical
+    category: secrets
+    enabled: true
+
+  - id: require_sbom
+    name: Require SBOM
+    description: Pipeline should include an SBOM or provenance generation step.
+    severity: medium
+    category: supply_chain
+    enabled: true
+
+  - id: require_pinned_pipeline_dependencies
+    name: Pinned pipeline dependencies
+    description: Images and actions should be pinned by digest or full SHA.
+    severity: high
+    category: supply_chain
+    enabled: true
+
+  - id: require_artifact_traceability
+    name: Artifact traceability
+    description: Builds should support artifact provenance or attestation.
+    severity: medium
+    category: supply_chain
+    enabled: true
+
+  - id: require_manual_promotion_gate
+    name: Manual promotion gate
+    description: Production deployments should require manual or approval gate.
+    severity: medium
+    category: governance
+    enabled: true
+
+  - id: require_audit_logging_evidence
+    name: Audit logging evidence
+    description: Deployment and promotion steps should be auditable.
+    severity: low
+    category: governance
+    enabled: true

@@ -1,0 +1,33 @@
+# Insecure GitLab + Argo CD flow – for testing cross-system review
+# Issues: plaintext secret, unpinned images, no SBOM, no approval gate, direct deploy
+
+stages:
+  - build
+  - test
+  - deploy
+
+variables:
+  API_KEY: "sk-live-demo1234567890abcdef"
+  DOCKER_IMAGE: "myapp:latest"
+
+build:
+  stage: build
+  image: docker:latest
+  script:
+    - docker build -t $DOCKER_IMAGE .
+    - docker push $DOCKER_IMAGE
+  # No SBOM step, no artifact retention
+
+test:
+  stage: test
+  image: alpine:latest
+  script:
+    - echo "Running tests"
+    - curl -H "Authorization: Bearer $API_KEY" https://api.example.com/check
+
+deploy:
+  stage: deploy
+  script:
+    - kubectl apply -f k8s/
+  # No when: manual for production
+  # No approval gate – risky promotion flow

@@ -1,0 +1,33 @@
+# Example GitLab CI with intentional issues for testing the agent
+
+stages:
+  - build
+  - test
+  - deploy
+
+variables:
+  # BAD: plaintext secret (for demo only)
+  API_KEY: "sk-live-1234567890abcdef"
+  DOCKER_IMAGE: "myapp:latest"
+
+build:
+  stage: build
+  image: docker:latest
+  script:
+    - docker build -t $DOCKER_IMAGE .
+    - docker push $DOCKER_IMAGE
+  # No SBOM step
+
+test:
+  stage: test
+  image: alpine:latest
+  script:
+    - echo "Running tests"
+    - curl -H "Authorization: Bearer $API_KEY" https://api.example.com/check
+
+deploy:
+  stage: deploy
+  script:
+    - kubectl apply -f k8s/
+  # No when: manual for production
+  # No approval gate

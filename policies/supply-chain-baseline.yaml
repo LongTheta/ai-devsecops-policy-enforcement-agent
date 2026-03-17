@@ -1,0 +1,24 @@
+name: supply-chain-baseline
+description: Supply chain and artifact integrity baseline
+
+rules:
+  - id: require_sbom
+    name: Require SBOM
+    description: Pipeline must generate SBOM (e.g. CycloneDX, SPDX).
+    severity: high
+    category: supply_chain
+    enabled: true
+
+  - id: require_pinned_pipeline_dependencies
+    name: Pinned pipeline dependencies
+    description: No latest tags; pin by digest or full SHA.
+    severity: high
+    category: supply_chain
+    enabled: true
+
+  - id: require_artifact_traceability
+    name: Artifact traceability
+    description: Build provenance or attestation recommended.
+    severity: medium
+    category: supply_chain
+    enabled: true

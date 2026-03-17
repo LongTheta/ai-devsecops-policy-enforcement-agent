@@ -1,0 +1,33 @@
+[project]
+name = "ai-devsecops-policy-enforcement-agent"
+version = "0.1.0"
+description = "AI-assisted DevSecOps policy enforcement framework for CI/CD, GitOps, and compliance-aware platform delivery"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "click>=8.0",
+    "python-dotenv>=1.0",
+    "requests>=2.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "pytest-cov>=4.0",
+]
+
+[project.scripts]
+ai-devsecops-agent = "ai_devsecops_agent.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_devsecops_agent"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

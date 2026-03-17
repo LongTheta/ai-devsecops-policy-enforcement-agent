@@ -1,0 +1,47 @@
+name: fedramp-moderate
+description: Stricter policy set aligned with FedRAMP Moderate expectations (engineering guidance only)
+
+rules:
+  - id: no_plaintext_secrets
+    name: No plaintext secrets
+    description: No hardcoded credentials; use vault or managed secrets.
+    severity: critical
+    category: secrets
+    enabled: true
+
+  - id: require_sbom
+    name: Require SBOM
+    description: SBOM generation required for supply chain visibility.
+    severity: high
+    category: supply_chain
+    enabled: true
+
+  - id: require_pinned_pipeline_dependencies
+    name: Pinned pipeline dependencies
+    description: All images and actions must be pinned by digest or SHA.
+    severity: high
+    category: supply_chain
+    enabled: true
+
+  - id: require_signed_artifacts
+    name: Require signed artifacts
+    description: Critical artifacts should be signed (e.g. cosign).
+    severity: high
+    category: supply_chain
+    enabled: true
+    config:
+      scope: production
+
+  - id: require_manual_promotion_gate
+    name: Manual promotion gate
+    description: Production promotions require explicit approval.
+    severity: high
+    category: governance
+    enabled: true
+
+  - id: require_audit_logging_evidence
+    name: Audit logging evidence
+    description: Deployment and change actions must be auditable.
+    severity: medium
+    category: governance
+    enabled: true
