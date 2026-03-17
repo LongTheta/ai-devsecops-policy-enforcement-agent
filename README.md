@@ -85,6 +85,8 @@ python -m ai_devsecops_agent.cli review \
 - **Severity breakdown** — critical, high, medium, low (in `artifacts/policy-summary.json`)
 - **Comments** — `artifacts/comments.json`, `artifacts/github-comments.json`, or `artifacts/gitlab-comments.json`
 - **Remediation artifacts** — `artifacts/remediations.json`
+## Actual Results
+<img width="594" height="620" alt="image" src="https://github.com/user-attachments/assets/cb94e048-e96e-4b45-a8b6-540fe82d5d7c" />
 
 ### Step 3 — Run auto-fix
 
