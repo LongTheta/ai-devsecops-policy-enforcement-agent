@@ -384,6 +384,26 @@ See [docs/WORKFLOW-INTEGRATION.md](docs/WORKFLOW-INTEGRATION.md).
 
 ---
 
+## Evaluation & Observability
+
+This system evaluates policy decisions using deterministic checks and structured outputs (pass/fail, severity, findings).
+
+Future extensions include:
+
+- tracking decision accuracy over time
+- measuring latency and cost per evaluation
+- regression testing for policy changes
+
+---
+
+## System Thinking
+
+This project includes design notes covering evaluation, reliability, and agent behavior in production-style environments.
+
+See: [docs/system-thinking.md](docs/system-thinking.md)
+
+---
+
 ## Design Principles
 
 - **Policy-driven, not hardcoded** — Rules live in YAML
