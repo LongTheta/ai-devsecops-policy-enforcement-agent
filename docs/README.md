@@ -26,6 +26,7 @@ This folder contains documentation for the AI DevSecOps Policy Enforcement Agent
 
 | Document | Description |
 |----------|-------------|
+| [system-thinking.md](system-thinking.md) | **System model** (policy / orchestration / memory), operational design, evaluation, failure modes |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | High-level architecture, data flow, and component overview |
 | [COMPONENTS.md](COMPONENTS.md) | **Detailed reference for each component** – models, CLI, analyzers, workflows, policies, reporting, review comments, remediation engine, integrations |
 | [WORKFLOWS.md](WORKFLOWS.md) | GitLab + Argo and GitHub + Argo combined workflows; report structure; comment and remediation commands |
@@ -39,6 +40,7 @@ This folder contains documentation for the AI DevSecOps Policy Enforcement Agent
 
 ## Quick links
 
+- **System model & operations** → [system-thinking.md](system-thinking.md)
 - **Understanding the system** → [ARCHITECTURE.md](ARCHITECTURE.md)
 - **Component details** → [COMPONENTS.md](COMPONENTS.md)
 - **Running reviews** → [WORKFLOWS.md](WORKFLOWS.md)

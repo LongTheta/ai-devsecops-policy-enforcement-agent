@@ -6,6 +6,20 @@ Internal guidance on **building and operating** AI-adjacent systems in productio
 
 ---
 
+## System Model
+
+- **Deterministic core (policy enforcement)** — Versioned rules and evaluators; same inputs yield the same verdicts and structured artifacts.
+- **Agent orchestration (decision layer)** — Plans steps, selects tools, and proposes actions through validated contracts; it does not replace or bypass policy.
+- **Persistent memory (state + trace)** — Task graph, handoffs, and execution history (for example Beads) so long-running workflows stay coherent and auditable.
+
+This separation ensures:
+
+- **Reliability** — Failures are localized; the enforcement path stays testable and repeatable.
+- **Auditability** — Authority and evidence live in policy outputs and traces, not in model prose.
+- **Controlled flexibility** — Orchestration can explore and iterate; only approved, validated actions affect production systems.
+
+---
+
 ## 1. Agent Design Considerations
 
 ### How agents decide what actions to take
