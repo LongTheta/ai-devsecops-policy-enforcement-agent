@@ -1,5 +1,25 @@
 # Documentation
 
+## System Role
+
+This repository represents the **deterministic enforcement layer** in a broader AI system.
+
+It is responsible for:
+
+- evaluating inputs against policy
+- producing auditable, structured decisions
+- acting as the final authority for pass/fail outcomes in CI/CD workflows
+
+In a full system, this layer operates alongside:
+
+- an **agent orchestration layer** (decision-making and workflow coordination)
+- a **memory layer** (persistent task state and execution traces)
+
+This separation ensures that:
+
+- policy enforcement remains deterministic and auditable
+- agent flexibility does not compromise system safety
+
 ## Overview
 
 This folder contains documentation for the AI DevSecOps Policy Enforcement Agent.
@@ -21,12 +41,15 @@ This folder contains documentation for the AI DevSecOps Policy Enforcement Agent
 - PR/MR check status API
 - Auto-fix commit bot (Git-based apply)
 - Digest/SHA resolution for pin fixers (Docker/GitHub API)
+- Agent orchestration integration (e.g., Gastown-style workflows)
+- Persistent task/memory layer for long-running workflows (e.g., Beads-style graph)
+- Execution trace capture across multi-step workflows
 
 ## Documents
 
 | Document | Description |
 |----------|-------------|
-| [system-thinking.md](system-thinking.md) | **System model** (policy / orchestration / memory), operational design, evaluation, failure modes |
+| [system-thinking.md](system-thinking.md) | **System-level design** – how deterministic enforcement, agent orchestration, and memory layers interact, including evaluation, failure modes, and operational tradeoffs |
 | [ARCHITECTURE.md](ARCHITECTURE.md) | High-level architecture, data flow, and component overview |
 | [COMPONENTS.md](COMPONENTS.md) | **Detailed reference for each component** – models, CLI, analyzers, workflows, policies, reporting, review comments, remediation engine, integrations |
 | [WORKFLOWS.md](WORKFLOWS.md) | GitLab + Argo and GitHub + Argo combined workflows; report structure; comment and remediation commands |
@@ -46,3 +69,15 @@ This folder contains documentation for the AI DevSecOps Policy Enforcement Agent
 - **Running reviews** → [WORKFLOWS.md](WORKFLOWS.md)
 - **CI/CD integration** → [WORKFLOW-INTEGRATION.md](WORKFLOW-INTEGRATION.md)
 - **Configuring policies** → [POLICY-MODEL.md](POLICY-MODEL.md)
+
+## System Evolution
+
+This system is intentionally deterministic.
+
+Future evolution includes:
+
+- integrating agent-based orchestration for multi-step workflows
+- introducing persistent memory for long-running task coordination
+- extending evaluation to include execution path and decision quality
+
+The core principle remains: **policy enforcement and validation stay outside the agent runtime**.

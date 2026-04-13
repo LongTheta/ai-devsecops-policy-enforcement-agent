@@ -16,7 +16,7 @@ report.md
 bundle.json
 autofix-report.md
 
-# Beads / Dolt files (added by bd init)
+# Beads from Gastown (https://github.com/gastownhall/beads) — Dolt / local DB files from bd init
 .dolt/
 *.db
 .beads-credential-key
