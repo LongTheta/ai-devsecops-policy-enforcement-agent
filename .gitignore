@@ -15,3 +15,8 @@ artifacts/
 report.md
 bundle.json
 autofix-report.md
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key

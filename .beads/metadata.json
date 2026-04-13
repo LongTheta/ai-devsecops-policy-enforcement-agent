@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "server",
+  "dolt_database": "ai_devsecops_policy_enforcement_agent",
+  "project_id": "fb0e0f31-3711-42dc-ab27-3c2b350cec7c"
+}
