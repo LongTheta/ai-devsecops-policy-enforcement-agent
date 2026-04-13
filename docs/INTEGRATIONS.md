@@ -30,7 +30,7 @@
 
 Future versions may expose:
 
-- **MCP server** – Tools/resources for “review this path” or “review MR/PR” for use in Cursor, Claude, or other MCP clients.
+- **MCP server** – Tools/resources for “review this path” or “review MR/PR” for use in Claude, VS Code MCP, or other MCP clients.
 - **REST API** – POST `/review` with pipeline/manifest payload; return JSON report for CI or dashboards.
 
 ---
